@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OptionsAI — Institutional Intelligence for Every Trader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #050508;
+    --bg-card: #0c0c14;
+    --bg-card2: #111120;
+    --bg-hover: #181830;
+    --border: rgba(100,100,180,0.15);
+    --border-glow: rgba(99,102,241,0.4);
+    --accent: #6366f1;
+    --accent2: #22d3ee;
+    --accent3: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --text-primary: #f1f1f8;
+    --text-secondary: #8888aa;
+    --text-muted: #444466;
+    --gold: #d4af37;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #bg-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  #root { position: relative; z-index: 1; }
+
+  /* ── NAVBAR ── */
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px;
+    background: rgba(5,5,8,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  /* FIX 1: Added background-clip alongside -webkit-background-clip (Line 68 fix) */
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 800;
+    background: linear-gradient(135deg, #6366f1, #22d3ee);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .nav-logo span {
+    color: var(--accent3);
+    -webkit-text-fill-color: var(--accent3);
+  }
+
+  .nav-center { display: flex; gap: 4px; }
+
+  .nav-tab {
+    padding: 8px 18px; border-radius: 8px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    background: none;
+  }
+  .nav-tab:hover { color: var(--text-primary); background: var(--bg-card2); }
+  .nav-tab.active {
+    color: var(--accent2); background: rgba(34,211,238,0.08);
+    border-color: rgba(34,211,238,0.25);
+  }
+
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+
+  .lang-btn {
+    padding: 6px 14px; border-radius: 6px;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--text-secondary); cursor: pointer;
+    border: 1px solid var(--border); background: none;
+    transition: all 0.2s;
+  }
+  .lang-btn:hover, .lang-btn.active {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(99,102,241,0.1);
+  }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--accent-green);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.4); }
+  }
+
+  /* ── BACKEND STATUS BANNER ── */
+  .status-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px;
+    font-family: var(--font-mono); font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .status-banner.offline {
+    background: rgba(245,158,11,0.08);
+    color: var(--accent-yellow);
+  }
+  .status-banner.online {
+    background: rgba(16,185,129,0.08);
+    color: var(--accent-green);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .main { display: flex; min-height: calc(100vh - 65px); }
+
+  .sidebar {
+    width: 260px; min-width: 260px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  .filter-group label {
+    display: block; font-family: var(--font-mono);
+    font-size: 10px; font-weight: 500; letter-spacing: 1px;
+    color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  .filter-select, .filter-input {
+    width: 100%; padding: 10px 14px; border-radius: 8px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    color: var(--text-primary); font-family: var(--font-mono); font-size: 12px;
+    outline: none; transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+  .filter-select option { background: var(--bg-card2); }
+
+  .sidebar-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+  .stat-mini { display: flex; flex-direction: column; gap: 8px; }
+  .stat-mini-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-radius: 8px; background: var(--bg-card2);
+    border: 1px solid var(--border);
+  }
+  .stat-mini-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+  .stat-mini-value { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+  .refresh-btn {
+    width: 100%; padding: 11px; border-radius: 8px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(34,211,238,0.1));
+    border: 1px solid var(--border-glow); color: var(--accent2);
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    cursor: pointer; letter-spacing: 0.5px; transition: all 0.2s;
+  }
+  .refresh-btn:hover { background: rgba(99,102,241,0.3); transform: translateY(-1px); }
+
+  /* ── CONTENT AREA ── */
+  .content { flex: 1; padding: 24px; overflow-y: auto; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { margin-bottom: 24px; }
+
+  /* FIX 2: Added background-clip alongside -webkit-background-clip (Line 178 fix) */
+  .page-title {
+    font-family: var(--font-display); font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, #f1f1f8, #8888aa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .page-subtitle { font-size: 13px; color: var(--text-secondary); }
+
+  /* ── CHART GRID ── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-grid.two-col { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid.full { grid-template-columns: 1fr; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    transition: border-color 0.3s, transform 0.2s;
+    animation: fadeInUp 0.4s ease both;
+  }
+  .card:hover { border-color: rgba(99,102,241,0.3); }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-family: var(--font-display); font-size: 13px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: 0.3px;
+  }
+  .card-badge {
+    font-family: var(--font-mono); font-size: 10px; padding: 3px 8px;
+    border-radius: 4px; font-weight: 500;
+  }
+  .badge-live { background: rgba(16,185,129,0.15); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); }
+  .badge-ai   { background: rgba(99,102,241,0.15); color: var(--accent);       border: 1px solid rgba(99,102,241,0.3); }
+  .badge-ml   { background: rgba(34,211,238,0.15); color: var(--accent2);      border: 1px solid rgba(34,211,238,0.3); }
+  .badge-mock { background: rgba(245,158,11,0.15); color: var(--accent3);      border: 1px solid rgba(245,158,11,0.3); }
+
+  /* ── BOTTOM BAR ── */
+  .bottom-bar {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    padding: 4px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px; margin-top: 16px;
+    animation: fadeInUp 0.4s ease both;
+  }
+  .bstat {
+    flex: 1; min-width: 110px;
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 14px;
+    border-right: 1px solid var(--border);
+  }
+  .bstat:last-child { border-right: none; }
+  .bstat-label  { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.8px; }
+  .bstat-value  { font-family: var(--font-mono); font-size: 17px; font-weight: 500; color: var(--text-primary); }
+  .bstat-value.green { color: var(--accent-green); }
+  .bstat-value.red   { color: var(--accent-red); }
+  .bstat-value.gold  { color: var(--gold); }
+
+  /* ── FINGERPRINT ── */
+  .similarity-card {
+    background: var(--bg-card2);
+    border: 1px solid var(--border-glow);
+    border-radius: 12px; padding: 18px; margin-bottom: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .similarity-card:hover { border-color: var(--accent); background: var(--bg-hover); }
+  .sim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .sim-date  { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+  .sim-score { font-family: var(--font-mono); font-size: 20px; font-weight: 500; color: var(--accent); }
+  .sim-bar-bg   { height: 4px; background: var(--bg-deep); border-radius: 2px; margin-top: 8px; }
+  .sim-bar-fill { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+  /* ── TRAP DETECTOR ── */
+  .trap-banner {
+    border-radius: 12px; padding: 20px 24px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 16px;
+    animation: fadeInUp 0.3s ease;
+  }
+  .trap-banner.GREEN { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); }
+  .trap-banner.YELLOW { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); }
+  .trap-banner.RED {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    animation: pulse-border 2s infinite;
+  }
+  @keyframes pulse-border {
+    0%, 100% { border-color: rgba(239,68,68,0.3); }
+    50% { border-color: rgba(239,68,68,0.7); box-shadow: 0 0 20px rgba(239,68,68,0.2); }
+  }
+  .trap-icon { font-size: 32px; }
+  .trap-text h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .trap-text.GREEN h3 { color: var(--accent-green); }
+  .trap-text.YELLOW h3 { color: var(--accent-yellow); }
+  .trap-text.RED h3   { color: var(--accent-red); }
+  .trap-text p { font-size: 13px; color: var(--text-secondary); }
+
+  .trap-item {
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .crowding-bar  { width: 80px; height: 6px; background: var(--bg-deep); border-radius: 3px; overflow: hidden; }
+  .crowding-fill { height: 6px; border-radius: 3px; }
+
+  /* ── AI CHAT ── */
+  .ai-chat-container { display: flex; flex-direction: column; gap: 12px; }
+  .ai-message {
+    padding: 14px 18px; border-radius: 12px;
+    font-size: 13px; line-height: 1.6;
+    animation: fadeInUp 0.3s ease;
+  }
+  .ai-message.ai {
+    background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2);
+    color: var(--text-primary); align-self: flex-start; max-width: 90%;
+  }
+  .ai-message.user {
+    background: var(--bg-card2); border: 1px solid var(--border);
+    color: var(--text-secondary); align-self: flex-end; max-width: 80%;
+    text-align: right;
+  }
+  .ai-input-row { display: flex; gap: 8px; margin-top: 12px; }
+  .ai-input {
+    flex: 1; padding: 12px 16px; border-radius: 10px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    color: var(--text-primary); font-family: var(--font-body); font-size: 13px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .ai-input:focus { border-color: var(--accent); }
+  .ai-send-btn {
+    padding: 12px 20px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #818cf8);
+    border: none; color: white; cursor: pointer;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    transition: all 0.2s; letter-spacing: 0.5px;
+  }
+  .ai-send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
+  .ai-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ── ANOMALY ── */
+  .anomaly-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-radius: 10px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    margin-bottom: 8px; transition: all 0.2s;
+  }
+  .anomaly-item:hover { border-color: var(--accent); }
+  .anomaly-strike {
+    font-family: var(--font-mono); font-size: 16px; font-weight: 500;
+    color: var(--accent2); min-width: 70px;
+  }
+  .anomaly-type-badge {
+    font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border-radius: 4px;
+  }
+  .anomaly-type-badge.HIGH_OI     { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .anomaly-type-badge.HIGH_VOLUME { background: rgba(245,158,11,0.15);  color: var(--accent3); }
+  .anomaly-scores { margin-left: auto; display: flex; gap: 12px; }
+  .anomaly-score-item { text-align: right; }
+  .anomaly-score-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+  .anomaly-score-val   { font-family: var(--font-mono); font-size: 13px; }
+
+  /* ── LOADING ── */
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; gap: 12px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+  }
+  .loading-spinner {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* ── GLOW ── */
+  .glow-accent { box-shadow: 0 0 30px rgba(99,102,241,0.15); }
+
+  /* ── OUTCOME ROW ── */
+  .outcome-row { display: flex; gap: 12px; margin-top: 12px; }
+  .outcome-box {
+    flex: 1; background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .outcome-box-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.8px; }
+  .outcome-box-val   { font-family: var(--font-mono); font-size: 15px; font-weight: 500; }
+
+  /* ── HISTORY TABLE ── */
+  .history-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .history-table th {
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+    letter-spacing: 0.8px;
+  }
+  .history-table td {
+    padding: 10px 12px; border-bottom: 1px solid rgba(100,100,180,0.08);
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
+  }
+  .history-table tr:hover td { background: var(--bg-card2); }
+
+  /* ── BUTTONS ── */
+  .analyze-btn {
+    padding: 12px 28px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; color: white; cursor: pointer;
+    font-family: var(--font-display); font-size: 14px; font-weight: 600;
+    transition: all 0.2s; letter-spacing: 0.3px;
+  }
+  .analyze-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99,102,241,0.4); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .suggestion-btn {
+    padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: 11px; font-family: var(--font-mono);
+    transition: all 0.2s;
+  }
+  .suggestion-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const BASE_URL = "http://localhost:8000";
+
+// ── MOCK DATA (used when backend is offline) ─────────────────────────────────
+const STRIKES = Array.from({ length: 31 }, (_, i) => 21000 + i * 100);
+const EXPIRIES = ["2025-01-30", "2025-02-27", "2025-03-27"];
+const SPOT = 22480;
+const ATM = 22500;
+
+function mockIVCurve() {
+  return {
+    strikes: STRIKES,
+    iv: STRIKES.map(s => {
+      const m = (s - SPOT) / SPOT;
+      return +(0.18 + 0.05 * m * m + (Math.random() * 0.01)).toFixed(4);
+    }),
+    expiry: EXPIRIES[0],
+  };
+}
+
+function mockSurface() {
+  const z = EXPIRIES.map((_, ei) =>
+    STRIKES.map(s => {
+      const m = (s - SPOT) / SPOT;
+      return +(0.17 + ei * 0.01 + 0.05 * m * m).toFixed(4);
+    })
+  );
+  return { strikes: STRIKES, expiries: EXPIRIES, z };
+}
+
+function mockOIDist() {
+  return {
+    strikes: STRIKES,
+    call_oi: STRIKES.map(s => Math.max(0, Math.round(8000 * Math.exp(-0.5 * ((s - ATM) / 400) ** 2) + Math.random() * 500))),
+    put_oi:  STRIKES.map(s => Math.max(0, Math.round(7500 * Math.exp(-0.5 * ((s - ATM) / 400) ** 2) + Math.random() * 500))),
+  };
+}
+
+function mockHeatmap() {
+  const times = Array.from({ length: 20 }, (_, i) => `2025-01-15 ${String(9 + Math.floor(i * 0.75)).padStart(2,'0')}:${String((i * 45) % 60).padStart(2,'0')}`);
+  const strikes = STRIKES.filter((_, i) => i % 3 === 0);
+  const values = times.map(() => strikes.map(() => Math.round(Math.random() * 5000)));
+  return { timestamps: times, strikes, values };
+}
+
+function mockPCR() {
+  const times = Array.from({ length: 30 }, (_, i) => `2025-01-15 ${String(9 + Math.floor(i / 4)).padStart(2,'0')}:${String((i * 15) % 60).padStart(2,'0')}`);
+  return { timestamps: times, pcr: times.map(() => +(0.7 + Math.random() * 0.7).toFixed(3)) };
+}
+
+function mockSummary() {
+  return {
+    spot_price: SPOT, atm_strike: ATM, max_pain_strike: 22300,
+    total_call_oi: 1842600, total_put_oi: 1654200,
+    total_volume: 892400, pcr: 0.898,
+  };
+}
+
+function mockTrap() {
+  return {
+    status: "YELLOW",
+    message: "Moderate call concentration at 22700–22800. Watch for potential unwind if spot crosses 22750.",
+    traps: [
+      { strike: 22700, side: "CALLS", score: 62, oi: 84200, dominance: 0.81 },
+      { strike: 22800, side: "CALLS", score: 54, oi: 67100, dominance: 0.78 },
+      { strike: 22200, side: "PUTS",  score: 41, oi: 52300, dominance: 0.22 },
+    ],
+  };
+}
+
+function mockChain() {
+  return {
+    strikes: STRIKES,
+    call_oi: STRIKES.map(s => Math.max(0, Math.round(9000 * Math.exp(-0.5 * ((s - ATM) / 400) ** 2) + Math.random() * 300))),
+    put_oi:  STRIKES.map(s => Math.max(0, Math.round(8500 * Math.exp(-0.5 * ((s - ATM) / 350) ** 2) + Math.random() * 300))),
+  };
+}
+
+function mockHistory() {
+  return {
+    events: [
+      { date: "2025-01-15 10:30", strike_zone: "22500–22700", side: "CALLS", score: 82, resolved_in: "3 candles", outcome: "Price dropped 180 pts" },
+      { date: "2025-01-10 13:45", strike_zone: "21800–22000", side: "PUTS",  score: 74, resolved_in: "5 candles", outcome: "Price rose 220 pts" },
+      { date: "2024-12-28 11:00", strike_zone: "23000–23200", side: "CALLS", score: 91, resolved_in: "2 candles", outcome: "Violent 300 pt reversal" },
+    ],
+  };
+}
+
+function mockAnomalies() {
+  const results = [
+    { strike: 22800, expiry: "2025-01-30", oi_zscore: 3.2,  vol_zscore: 1.8, call_oi: 42000, put_oi: 8200,  iv: 0.231, anomaly_type: "HIGH_OI"     },
+    { strike: 21500, expiry: "2025-01-30", oi_zscore: 1.1,  vol_zscore: 3.7, call_oi: 12000, put_oi: 38000, iv: 0.198, anomaly_type: "HIGH_VOLUME"  },
+    { strike: 23000, expiry: "2025-02-27", oi_zscore: 2.8,  vol_zscore: 2.1, call_oi: 35000, put_oi: 6000,  iv: 0.245, anomaly_type: "HIGH_OI"     },
+    { strike: 22000, expiry: "2025-01-30", oi_zscore: -0.4, vol_zscore: 2.9, call_oi: 18000, put_oi: 22000, iv: 0.182, anomaly_type: "HIGH_VOLUME"  },
+    { strike: 23500, expiry: "2025-03-27", oi_zscore: 3.8,  vol_zscore: 0.6, call_oi: 48000, put_oi: 3200,  iv: 0.268, anomaly_type: "HIGH_OI"     },
+  ];
+  return { anomalies: results, total_found: results.length };
+}
+
+function mockFingerprint() {
+  return {
+    fingerprint: { iv_skew: 0.0421, oi_ratio: 1.114, volume_concentration: 0.182, atm_iv: 0.1834, term_slope: 0.0121, vol_oi_divergence: 0.243 },
+    spot: SPOT,
+    timestamp: "2025-01-15 14:30",
+  };
+}
+
+function mockMatches() {
+  return {
+    current_fingerprint: mockFingerprint().fingerprint,
+    matches: [
+      { timestamp: "2024-11-08 10:15", similarity: 91.4, spot: 19820, fingerprint: { iv_skew: 0.039, oi_ratio: 1.08, volume_concentration: 0.19, atm_iv: 0.175, term_slope: 0.015, vol_oi_divergence: 0.261 } },
+      { timestamp: "2024-09-20 13:45", similarity: 87.2, spot: 25410, fingerprint: { iv_skew: 0.045, oi_ratio: 1.15, volume_concentration: 0.17, atm_iv: 0.191, term_slope: 0.009, vol_oi_divergence: 0.228 } },
+      { timestamp: "2024-07-04 11:30", similarity: 83.6, spot: 23870, fingerprint: { iv_skew: 0.038, oi_ratio: 1.09, volume_concentration: 0.201, atm_iv: 0.177, term_slope: 0.018, vol_oi_divergence: 0.255 } },
+    ],
+  };
+}
+
+function mockOutcome() {
+  return {
+    outcomes: [
+      { timestamp: "T+1", spot: SPOT + 45,  avg_iv: 0.191, call_oi: 920000, put_oi: 840000 },
+      { timestamp: "T+2", spot: SPOT - 120, avg_iv: 0.207, call_oi: 880000, put_oi: 910000 },
+      { timestamp: "T+3", spot: SPOT - 280, avg_iv: 0.225, call_oi: 820000, put_oi: 980000 },
+    ],
+  };
+}
+
+// ── API WITH MOCK FALLBACK ───────────────────────────────────────────────────
+const MOCK_MAP = {
+  "/dashboard/summary":        mockSummary,
+  "/dashboard/expiries":       () => ({ expiries: EXPIRIES }),
+  "/dashboard/surface":        mockSurface,
+  "/dashboard/oi-distribution":mockOIDist,
+  "/dashboard/volume-heatmap": mockHeatmap,
+  "/dashboard/pcr-trend":      mockPCR,
+  "/trap/current":             mockTrap,
+  "/trap/chain":               mockChain,
+  "/trap/history":             mockHistory,
+  "/anomaly/detect":           mockAnomalies,
+  "/fingerprint/match":        mockMatches,
+  "/fingerprint/outcome":      mockOutcome,
+};
+
+let backendOnline = false;
+
+const api = async (path, opts = {}) => {
+  // strip query params for mock lookup
+  const basePath = path.split("?")[0];
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`${BASE_URL}${path}`, { ...opts, signal: controller.signal });
+    clearTimeout(timer);
+    backendOnline = true;
+    // special iv-curve handling
+    if (basePath === "/dashboard/iv-curve") {
+      const d = await res.json();
+      return d;
+    }
+    return await res.json();
+  } catch {
+    backendOnline = false;
+    // special iv-curve mock
+    if (basePath === "/dashboard/iv-curve") return mockIVCurve();
+    if (basePath === "/fingerprint/compute") return mockFingerprint();
+    if (basePath === "/ai/insight") return { insight: "⚠️ Backend offline — AI is unavailable. Start the backend with:\n\ncd codeforge\nuvicorn backend:app --reload --port 8000\n\nThen refresh this page." };
+    const mockFn = MOCK_MAP[basePath];
+    return mockFn ? mockFn() : null;
+  }
+};
+
+// ── TRANSLATIONS ─────────────────────────────────────────────────────────────
+const T = {
+  en: {
+    dashboard:"Dashboard", fingerprint:"Fingerprint", trap:"Trap Detector", anomaly:"Anomaly", ai:"AI Insight",
+    ivCurve:"IV Smile Curve", surface:"Volatility Surface", oidist:"OI Distribution",
+    heatmap:"Volume Heatmap", pcr:"PCR Trend", atm:"ATM Tracker",
+    totalCallOI:"TOTAL CALL OI", totalPutOI:"TOTAL PUT OI", totalVol:"TOTAL VOLUME",
+    currentATM:"ATM STRIKE", maxPain:"MAX PAIN", spot:"SPOT PRICE",
+    analyzing:"Analyzing...", analyze:"Analyze Fingerprint",
+    matchFound:"Historical Match Found", whatHappened:"What Happened After",
+    trapStatus:"Trap Status", loading:"Loading...",
+    askAI:"Ask AI anything about options...", send:"SEND",
+    anomaliesFound:"Anomalies Detected", refresh:"↻  REFRESH DATA",
+    currentMarket:"Current Market Fingerprint",
+    selectExpiry:"SELECT EXPIRY", selectUnderlying:"UNDERLYING ASSET",
+    dateRange:"DATE RANGE", crowding:"CROWDING SCORE",
+    backendOffline:"Backend offline — showing demo data. Run: uvicorn backend:app --port 8000",
+    backendOnline:"Backend connected — showing live data",
+  },
+  hi: {
+    dashboard:"डैशबोर्ड", fingerprint:"फिंगरप्रिंट", trap:"ट्रैप डिटेक्टर", anomaly:"विसंगति", ai:"AI अंतर्दृष्टि",
+    ivCurve:"IV स्माइल वक्र", surface:"वोलेटिलिटी सर्फेस", oidist:"OI वितरण",
+    heatmap:"वॉल्यूम हीटमैप", pcr:"PCR ट्रेंड", atm:"ATM ट्रैकर",
+    totalCallOI:"कुल कॉल OI", totalPutOI:"कुल पुट OI", totalVol:"कुल वॉल्यूम",
+    currentATM:"ATM स्ट्राइक", maxPain:"मैक्स पेन", spot:"स्पॉट प्राइस",
+    analyzing:"विश्लेषण...", analyze:"फिंगरप्रिंट विश्लेषण",
+    matchFound:"ऐतिहासिक मिलान", whatHappened:"इसके बाद क्या हुआ",
+    trapStatus:"ट्रैप स्थिति", loading:"लोड हो रहा है...",
+    askAI:"ऑप्शन्स के बारे में पूछें...", send:"भेजें",
+    anomaliesFound:"विसंगतियां मिलीं", refresh:"↻  रिफ्रेश करें",
+    currentMarket:"वर्तमान मार्केट फिंगरप्रिंट",
+    selectExpiry:"एक्सपायरी चुनें", selectUnderlying:"अंडरलाइंग एसेट",
+    dateRange:"दिनांक सीमा", crowding:"भीड़ स्कोर",
+    backendOffline:"बैकएंड ऑफलाइन — डेमो डेटा दिखाया जा रहा है",
+    backendOnline:"बैकएंड कनेक्टेड — लाइव डेटा",
+  },
+  mr: {
+    dashboard:"डॅशबोर्ड", fingerprint:"फिंगरप्रिंट", trap:"ट्रॅप डिटेक्टर", anomaly:"विसंगती", ai:"AI अंतर्दृष्टी",
+    ivCurve:"IV स्माइल वक्र", surface:"वोलेटिलिटी पृष्ठ", oidist:"OI वितरण",
+    heatmap:"व्हॉल्यूम हीटमॅप", pcr:"PCR ट्रेंड", atm:"ATM ट्रॅकर",
+    totalCallOI:"एकूण कॉल OI", totalPutOI:"एकूण पुट OI", totalVol:"एकूण व्हॉल्यूम",
+    currentATM:"ATM स्ट्राइक", maxPain:"मॅक्स पेन", spot:"स्पॉट किंमत",
+    analyzing:"विश्लेषण...", analyze:"फिंगरप्रिंट विश्लेषण",
+    matchFound:"ऐतिहासिक जुळणी", whatHappened:"त्यानंतर काय झाले",
+    trapStatus:"ट्रॅप स्थिती", loading:"लोड होत आहे...",
+    askAI:"ऑप्शन्सबद्दल विचारा...", send:"पाठवा",
+    anomaliesFound:"विसंगती आढळल्या", refresh:"↻  रिफ्रेश",
+    currentMarket:"सद्य मार्केट फिंगरप्रिंट",
+    selectExpiry:"एक्सपायरी निवडा", selectUnderlying:"अंडरलाइंग",
+    dateRange:"तारीख श्रेणी", crowding:"गर्दी स्कोर",
+    backendOffline:"बॅकएंड ऑफलाइन — डेमो डेटा",
+    backendOnline:"बॅकएंड कनेक्टेड — लाइव्ह डेटा",
+  },
+};
+
+// ── PLOTLY THEME ─────────────────────────────────────────────────────────────
+const PLY = {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#8888aa', family: 'DM Mono', size: 9 },
+  modebar: { bgcolor: 'transparent' },
+};
+
+// ── CHARTS ───────────────────────────────────────────────────────────────────
+
+function IVCurveChart({ expiry, lang }) {
+  const ref = useRef(); const [data, setData] = useState(null);
+  useEffect(() => { api(`/dashboard/iv-curve?expiry=${expiry || EXPIRIES[0]}`).then(d => { if (d) setData(d); }); }, [expiry]);
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    Plotly.newPlot(ref.current, [{
+      x: data.strikes, y: data.iv.map(v => +(v * 100).toFixed(2)),
+      type: 'scatter', mode: 'lines+markers',
+      line: { color: '#6366f1', width: 2.5, shape: 'spline' },
+      marker: { color: '#22d3ee', size: 5 },
+      fill: 'tozeroy', fillcolor: 'rgba(99,102,241,0.08)',
+      hovertemplate: '<b>Strike: %{x}</b><br>IV: %{y:.2f}%<extra></extra>',
+    }], { ...PLY, margin: { t: 10, b: 40, l: 45, r: 10 },
+      xaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 9 } },
+      yaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 9 }, title: { text: 'IV %', font: { size: 10 } } },
+      showlegend: false,
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  if (!data) return <div className="loading"><div className="loading-spinner"/>{T[lang].loading}</div>;
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+function VolSurface3D({ lang }) {
+  const ref = useRef(); const [data, setData] = useState(null);
+  useEffect(() => { api('/dashboard/surface').then(d => { if (d) setData(d); }); }, []);
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    Plotly.newPlot(ref.current, [{
+      x: data.strikes, y: data.expiries,
+      z: data.z.map(row => row.map(v => v ? +(v * 100).toFixed(2) : null)),
+      type: 'surface',
+      colorscale: [[0,'#050508'],[0.25,'#1a1a3a'],[0.5,'#4f46e5'],[0.75,'#22d3ee'],[1,'#f59e0b']],
+      contours: { z: { show: true, usecolormap: true, project: { z: true } } },
+      hovertemplate: 'Strike: %{x}<br>Expiry: %{y}<br>IV: %{z:.2f}%<extra></extra>',
+    }], { ...PLY,
+      scene: { bgcolor: 'transparent',
+        xaxis: { gridcolor: 'rgba(100,100,180,0.2)', color: '#444466', title: 'Strike' },
+        yaxis: { gridcolor: 'rgba(100,100,180,0.2)', color: '#444466', title: 'Expiry' },
+        zaxis: { gridcolor: 'rgba(100,100,180,0.2)', color: '#444466', title: 'IV %' },
+      },
+      margin: { t: 10, b: 10, l: 10, r: 10 },
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  if (!data) return <div className="loading"><div className="loading-spinner"/>{T[lang].loading}</div>;
+  return <div ref={ref} style={{ height: 300 }} />;
+}
+
+function OIDistChart({ lang }) {
+  const ref = useRef(); const [data, setData] = useState(null);
+  useEffect(() => { api('/dashboard/oi-distribution').then(d => { if (d) setData(d); }); }, []);
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    Plotly.newPlot(ref.current, [
+      { x: data.strikes, y: data.call_oi, name: 'Call OI', type: 'bar',
+        marker: { color: 'rgba(16,185,129,0.7)', line: { color: 'rgba(16,185,129,0.3)', width: 1 } },
+        hovertemplate: 'Strike: %{x}<br>Call OI: %{y:,}<extra></extra>' },
+      { x: data.strikes, y: data.put_oi.map(v => -v), name: 'Put OI', type: 'bar',
+        marker: { color: 'rgba(239,68,68,0.7)', line: { color: 'rgba(239,68,68,0.3)', width: 1 } },
+        hovertemplate: 'Strike: %{x}<br>Put OI: %{y:,}<extra></extra>' },
+    ], { ...PLY, barmode: 'overlay', margin: { t: 10, b: 40, l: 55, r: 10 },
+      xaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      yaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      legend: { font: { size: 10, color: '#8888aa' }, bgcolor: 'transparent', x: 0.02, y: 0.98 },
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  if (!data) return <div className="loading"><div className="loading-spinner"/>{T[lang].loading}</div>;
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+function VolumeHeatmap({ lang }) {
+  const ref = useRef(); const [data, setData] = useState(null);
+  useEffect(() => { api('/dashboard/volume-heatmap').then(d => { if (d) setData(d); }); }, []);
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    const labels = data.timestamps.map(t => t.slice(11, 16));
+    Plotly.newPlot(ref.current, [{
+      z: data.values, x: data.strikes, y: labels, type: 'heatmap',
+      colorscale: [[0,'#050508'],[0.3,'#1a1a3a'],[0.6,'#4f46e5'],[1,'#22d3ee']],
+      hovertemplate: 'Strike: %{x}<br>Time: %{y}<br>Vol: %{z:,}<extra></extra>',
+      showscale: false,
+    }], { ...PLY, margin: { t: 10, b: 40, l: 50, r: 10 },
+      xaxis: { color: '#444466', tickfont: { size: 8 } },
+      yaxis: { color: '#444466', tickfont: { size: 8 } },
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  if (!data) return <div className="loading"><div className="loading-spinner"/>{T[lang].loading}</div>;
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+function PCRTrendChart({ lang }) {
+  const ref = useRef(); const [data, setData] = useState(null);
+  useEffect(() => { api('/dashboard/pcr-trend').then(d => { if (d) setData(d); }); }, []);
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    const labels = data.timestamps.map(t => t.slice(11, 16));
+    Plotly.newPlot(ref.current, [
+      { x: labels, y: data.pcr, type: 'scatter', mode: 'lines',
+        line: { color: '#f59e0b', width: 2, shape: 'spline' },
+        fill: 'tozeroy', fillcolor: 'rgba(245,158,11,0.06)',
+        hovertemplate: 'Time: %{x}<br>PCR: %{y:.3f}<extra></extra>' },
+      { x: labels, y: Array(labels.length).fill(1), type: 'scatter', mode: 'lines',
+        line: { color: 'rgba(100,100,180,0.3)', width: 1, dash: 'dot' }, showlegend: false },
+    ], { ...PLY, margin: { t: 10, b: 35, l: 45, r: 10 },
+      xaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      yaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      showlegend: false,
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  if (!data) return <div className="loading"><div className="loading-spinner"/>{T[lang].loading}</div>;
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+function ATMTrackerChart({ summary }) {
+  const ref = useRef();
+  useEffect(() => {
+    if (!summary || !ref.current) return;
+    const spot = summary.spot_price, atm = summary.atm_strike;
+    const strikes = Array.from({ length: 15 }, (_, i) => atm - 700 + i * 100);
+    Plotly.newPlot(ref.current, [
+      { x: strikes, y: strikes.map(s => Math.exp(-0.5 * ((s - spot) / 300) ** 2)),
+        type: 'scatter', mode: 'lines', fill: 'tozeroy',
+        fillcolor: 'rgba(34,211,238,0.07)', line: { color: '#22d3ee', width: 2, shape: 'spline' }, showlegend: false },
+      { x: [spot], y: [1.05], type: 'scatter', mode: 'markers+text',
+        marker: { color: '#10b981', size: 10, symbol: 'diamond' },
+        text: [`SPOT: ${spot}`], textposition: 'top center',
+        textfont: { color: '#10b981', size: 9, family: 'DM Mono' }, showlegend: false },
+      { x: [atm], y: [0.9], type: 'scatter', mode: 'markers+text',
+        marker: { color: '#f59e0b', size: 10, symbol: 'triangle-up' },
+        text: [`ATM: ${atm}`], textposition: 'bottom center',
+        textfont: { color: '#f59e0b', size: 9, family: 'DM Mono' }, showlegend: false },
+    ], { ...PLY, margin: { t: 20, b: 35, l: 10, r: 10 },
+      xaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      yaxis: { visible: false },
+    }, { responsive: true, displayModeBar: false });
+  }, [summary]);
+  if (!summary) return <div className="loading"><div className="loading-spinner"/></div>;
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+function RadarChart({ data, color }) {
+  const ref = useRef();
+  useEffect(() => {
+    if (!data || !ref.current) return;
+    const keys = Object.keys(data), vals = Object.values(data);
+    Plotly.newPlot(ref.current, [{
+      type: 'scatterpolar', r: [...vals, vals[0]], theta: [...keys, keys[0]],
+      fill: 'toself', fillcolor: color.fill,
+      line: { color: color.line, width: 2 }, marker: { color: color.line, size: 5 },
+      hovertemplate: '%{theta}: %{r:.4f}<extra></extra>',
+    }], { ...PLY,
+      polar: { bgcolor: 'transparent',
+        angularaxis: { color: '#444466', gridcolor: 'rgba(100,100,180,0.2)', tickfont: { size: 8, family: 'DM Mono' } },
+        radialaxis: { visible: false },
+      },
+      margin: { t: 20, b: 20, l: 30, r: 30 }, showlegend: false,
+    }, { responsive: true, displayModeBar: false });
+  }, [data]);
+  return <div ref={ref} style={{ height: 200 }} />;
+}
+
+// ── PAGES ─────────────────────────────────────────────────────────────────────
+
+function DashboardPage({ lang, isOnline }) {
+  const t = T[lang];
+  const [summary, setSummary] = useState(null);
+  const [expiries, setExpiries] = useState(EXPIRIES);
+  const [selectedExpiry, setSelectedExpiry] = useState(EXPIRIES[0]);
+  const [key, setKey] = useState(0);
+
+  const load = useCallback(() => {
+    api('/dashboard/summary').then(d => { if (d) setSummary(d); });
+    api('/dashboard/expiries').then(d => { if (d) { setExpiries(d.expiries); setSelectedExpiry(d.expiries[0]); } });
+    setKey(k => k + 1);
+  }, []);
+
+  useEffect(() => { load(); }, []);
+
+  const fmt = n => n != null ? n.toLocaleString('en-IN') : '—';
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">{t.dashboard}</div>
+        <div className="page-subtitle">Live options market analytics · NSE Options Chain · {isOnline ? '🟢 Live data' : '🟡 Demo data'}</div>
+      </div>
+      <div key={key}>
+        <div className="chart-grid">
+          <div className="card" style={{ animationDelay: '0.05s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.ivCurve}</span>
+              <span className={`card-badge ${isOnline ? 'badge-live' : 'badge-mock'}`}>{isOnline ? 'LIVE' : 'DEMO'}</span>
+            </div>
+            <IVCurveChart expiry={selectedExpiry} lang={lang} />
+          </div>
+          <div className="card" style={{ animationDelay: '0.1s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.oidist}</span>
+              <span className={`card-badge ${isOnline ? 'badge-live' : 'badge-mock'}`}>{isOnline ? 'LIVE' : 'DEMO'}</span>
+            </div>
+            <OIDistChart lang={lang} />
+          </div>
+          <div className="card" style={{ animationDelay: '0.15s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.atm}</span>
+              <span className={`card-badge ${isOnline ? 'badge-live' : 'badge-mock'}`}>{isOnline ? 'LIVE' : 'DEMO'}</span>
+            </div>
+            <ATMTrackerChart summary={summary} />
+          </div>
+        </div>
+
+        <div className="chart-grid full">
+          <div className="card glow-accent" style={{ animationDelay: '0.2s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.surface} — 3D Interactive</span>
+              <span className="card-badge badge-ml">ML</span>
+            </div>
+            <VolSurface3D lang={lang} />
+          </div>
+        </div>
+
+        <div className="chart-grid two-col">
+          <div className="card" style={{ animationDelay: '0.25s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.heatmap}</span>
+              <span className={`card-badge ${isOnline ? 'badge-live' : 'badge-mock'}`}>{isOnline ? 'LIVE' : 'DEMO'}</span>
+            </div>
+            <VolumeHeatmap lang={lang} />
+          </div>
+          <div className="card" style={{ animationDelay: '0.3s' }}>
+            <div className="card-header">
+              <span className="card-title">{t.pcr}</span>
+              <span className={`card-badge ${isOnline ? 'badge-live' : 'badge-mock'}`}>{isOnline ? 'LIVE' : 'DEMO'}</span>
+            </div>
+            <PCRTrendChart lang={lang} />
+          </div>
+        </div>
+
+        <div className="bottom-bar">
+          {summary ? <>
+            <div className="bstat"><span className="bstat-label">{t.spot}</span><span className="bstat-value gold">₹{fmt(summary.spot_price)}</span></div>
+            <div className="bstat"><span className="bstat-label">{t.currentATM}</span><span className="bstat-value">{fmt(summary.atm_strike)}</span></div>
+            <div className="bstat"><span className="bstat-label">{t.maxPain}</span><span className="bstat-value gold">{fmt(summary.max_pain_strike)}</span></div>
+            <div className="bstat"><span className="bstat-label">{t.totalCallOI}</span><span className="bstat-value green">{fmt(summary.total_call_oi)}</span></div>
+            <div className="bstat"><span className="bstat-label">{t.totalPutOI}</span><span className="bstat-value red">{fmt(summary.total_put_oi)}</span></div>
+            <div className="bstat"><span className="bstat-label">{t.totalVol}</span><span className="bstat-value">{fmt(summary.total_volume)}</span></div>
+            <div className="bstat">
+              <span className="bstat-label">PCR</span>
+              <span className="bstat-value" style={{ color: summary.pcr > 1 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                {summary.pcr?.toFixed(3)}
+              </span>
+            </div>
+          </> : <div className="loading" style={{ height: 60 }}><div className="loading-spinner"/></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FingerprintPage({ lang }) {
+  const t = T[lang];
+  const [current, setCurrent] = useState(null);
+  const [matches, setMatches] = useState(null);
+  const [outcomes, setOutcomes] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+
+  const analyze = async () => {
+    setLoading(true);
+    const fp = await api('/fingerprint/compute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    setCurrent(fp);
+    const m = await api('/fingerprint/match');
+    setMatches(m);
+    setLoading(false);
+  };
+
+  const loadOutcome = async (ts) => {
+    if (outcomes[ts]) { setSelectedMatch(ts); return; }
+    const o = await api(`/fingerprint/outcome?match_timestamp=${encodeURIComponent(ts)}`);
+    setOutcomes(p => ({ ...p, [ts]: o }));
+    setSelectedMatch(ts);
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Market Fingerprint Engine</div>
+        <div className="page-subtitle">Cosine similarity on 6D feature vectors to find historical market analogues</div>
+      </div>
+      <div className="chart-grid two-col">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">{t.currentMarket}</span>
+            <span className="card-badge badge-ml">ML · COSINE SIM</span>
+          </div>
+          {current?.fingerprint
+            ? <RadarChart data={current.fingerprint} color={{ fill: 'rgba(99,102,241,0.2)', line: '#6366f1' }} />
+            : <div className="loading" style={{ height: 200, flexDirection: 'column', gap: 12 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Click Analyze to compute fingerprint</div>
+              </div>
+          }
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button className="analyze-btn" onClick={analyze} disabled={loading}>
+              {loading ? t.analyzing : t.analyze}
+            </button>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">{t.matchFound}</span>
+            <span className="card-badge badge-ml">TOP 3 MATCHES</span>
+          </div>
+          {matches?.matches?.length > 0 ? (
+            matches.matches.map((m, i) => (
+              <div key={i} className="similarity-card" onClick={() => loadOutcome(m.timestamp)}>
+                <div className="sim-header">
+                  <span className="sim-date">#{i + 1} · {m.timestamp.slice(0, 16)}</span>
+                  <span className="sim-score">{m.similarity}%</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Spot: ₹{m.spot?.toFixed(0)} · Click to see outcome →
+                </div>
+                <div className="sim-bar-bg">
+                  <div className="sim-bar-fill" style={{ width: `${m.similarity}%` }} />
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="loading" style={{ height: 200 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Run analysis to see matches</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selectedMatch && outcomes[selectedMatch] && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <span className="card-title">{t.whatHappened} — {selectedMatch.slice(0, 16)}</span>
+            <span className="card-badge badge-ai">OUTCOME DATA</span>
+          </div>
+          <div className="outcome-row">
+            {outcomes[selectedMatch].outcomes.map((o, i) => (
+              <div key={i} className="outcome-box">
+                <div className="outcome-box-label">T+{i + 1}</div>
+                <div className="outcome-box-val" style={{ color: 'var(--text-primary)', fontSize: 13, marginBottom: 4 }}>
+                  ₹{o.spot?.toFixed(0)}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--accent2)' }}>
+                  IV: {(o.avg_iv * 100).toFixed(1)}%
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12, color: o.call_oi > o.put_oi ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                  PCR: {(o.put_oi / o.call_oi).toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrapPage({ lang }) {
+  const t = T[lang];
+  const [trap, setTrap] = useState(null);
+  const [chain, setChain] = useState(null);
+  const [history, setHistory] = useState(null);
+  const chainRef = useRef();
+
+  useEffect(() => {
+    api('/trap/current').then(d => { if (d) setTrap(d); });
+    api('/trap/chain').then(d => { if (d) setChain(d); });
+    api('/trap/history').then(d => { if (d) setHistory(d); });
+  }, []);
+
+  useEffect(() => {
+    if (!chain || !chainRef.current) return;
+    Plotly.newPlot(chainRef.current, [
+      { y: chain.strikes, x: chain.call_oi, name: 'Call OI', type: 'bar', orientation: 'h',
+        marker: { color: 'rgba(16,185,129,0.65)', line: { color: 'rgba(16,185,129,0.3)', width: 1 } },
+        hovertemplate: 'Strike: %{y}<br>Call OI: %{x:,}<extra></extra>' },
+      { y: chain.strikes, x: chain.put_oi.map(v => -v), name: 'Put OI', type: 'bar', orientation: 'h',
+        marker: { color: 'rgba(239,68,68,0.65)', line: { color: 'rgba(239,68,68,0.3)', width: 1 } },
+        hovertemplate: 'Strike: %{y}<br>Put OI: %{x:,}<extra></extra>' },
+    ], { ...PLY, barmode: 'overlay', margin: { t: 10, b: 40, l: 65, r: 10 },
+      xaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 } },
+      yaxis: { gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', tickfont: { size: 8 }, dtick: 500 },
+      legend: { font: { size: 10, color: '#8888aa' }, bgcolor: 'transparent' },
+    }, { responsive: true, displayModeBar: false });
+  }, [chain]);
+
+  const statusEmoji = { GREEN: '✅', YELLOW: '⚠️', RED: '🚨' };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">{t.trap}</div>
+        <div className="page-subtitle">Detects dangerous crowd positioning traps in the options chain</div>
+      </div>
+
+      {trap && (
+        <div className={`trap-banner ${trap.status}`}>
+          <div className="trap-icon">{statusEmoji[trap.status]}</div>
+          <div className={`trap-text ${trap.status}`}>
+            <h3>{t.trapStatus}: {trap.status}</h3>
+            <p>{trap.message}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="chart-grid two-col">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">OI Chain Heatmap</span>
+            <span className="card-badge badge-live">LIVE</span>
+          </div>
+          {chain ? <div ref={chainRef} style={{ height: 380 }} /> : <div className="loading"><div className="loading-spinner"/></div>}
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Top Trap Zones</span>
+            <span className="card-badge badge-ml">Z-SCORE</span>
+          </div>
+          {trap?.traps?.map((tr, i) => (
+            <div key={i} className="trap-item">
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--text-primary)', marginBottom: 3 }}>{tr.strike}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: tr.side === 'CALLS' ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                  {tr.side} · {(tr.dominance * 100).toFixed(1)}% dominated
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t.crowding}</div>
+                <div className="crowding-bar">
+                  <div className="crowding-fill" style={{
+                    width: `${tr.score}%`,
+                    background: tr.score > 70 ? 'var(--accent-red)' : tr.score > 40 ? 'var(--accent-yellow)' : 'var(--accent-green)',
+                  }} />
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', marginTop: 2 }}>{tr.score}/100</div>
+              </div>
+            </div>
+          ))}
+          {(!trap || !trap.traps?.length) && <div className="loading" style={{ height: 100 }}>No significant traps detected</div>}
+        </div>
+      </div>
+
+      {history && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <span className="card-title">Historical Trap Log</span>
+            <span className="card-badge badge-ml">HISTORICAL</span>
+          </div>
+          <table className="history-table">
+            <thead>
+              <tr><th>DATE / TIME</th><th>ZONE</th><th>SIDE</th><th>SCORE</th><th>RESOLVED</th><th>OUTCOME</th></tr>
+            </thead>
+            <tbody>
+              {history.events.map((e, i) => (
+                <tr key={i}>
+                  <td>{e.date}</td>
+                  <td style={{ color: 'var(--accent2)' }}>{e.strike_zone}</td>
+                  <td style={{ color: e.side === 'CALLS' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{e.side}</td>
+                  <td><span style={{ color: e.score > 80 ? 'var(--accent-red)' : 'var(--accent-yellow)' }}>{e.score}/100</span></td>
+                  <td>{e.resolved_in}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{e.outcome}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnomalyPage({ lang }) {
+  const t = T[lang];
+  const [anomalies, setAnomalies] = useState(null);
+  const scatterRef = useRef();
+
+  useEffect(() => { api('/anomaly/detect').then(d => { if (d) setAnomalies(d); }); }, []);
+
+  useEffect(() => {
+    if (!anomalies || !scatterRef.current) return;
+    Plotly.newPlot(scatterRef.current, [{
+      x: anomalies.anomalies.map(a => a.oi_zscore),
+      y: anomalies.anomalies.map(a => a.vol_zscore),
+      mode: 'markers+text',
+      marker: {
+        size: anomalies.anomalies.map(a => 8 + Math.abs(a.oi_zscore) * 4),
+        color: anomalies.anomalies.map(a => a.anomaly_type === 'HIGH_OI' ? '#6366f1' : '#f59e0b'),
+        opacity: 0.85, line: { color: 'rgba(255,255,255,0.15)', width: 1 },
+      },
+      text: anomalies.anomalies.map(a => String(a.strike)),
+      textposition: 'top center',
+      textfont: { color: '#8888aa', size: 9, family: 'DM Mono' },
+      hovertemplate: 'Strike: %{text}<br>OI Z: %{x:.2f}<br>Vol Z: %{y:.2f}<extra></extra>',
+    }], { ...PLY, margin: { t: 10, b: 45, l: 50, r: 10 },
+      xaxis: { title: { text: 'OI Z-Score', font: { size: 10 } }, gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', zeroline: true, zerolinecolor: 'rgba(100,100,180,0.3)' },
+      yaxis: { title: { text: 'Volume Z-Score', font: { size: 10 } }, gridcolor: 'rgba(100,100,180,0.1)', color: '#444466', zeroline: true, zerolinecolor: 'rgba(100,100,180,0.3)' },
+      shapes: [{ type: 'rect', x0: -2, x1: 2, y0: -2, y1: 2, fillcolor: 'rgba(16,185,129,0.04)', line: { color: 'rgba(16,185,129,0.2)', dash: 'dot' } }],
+      showlegend: false,
+    }, { responsive: true, displayModeBar: false });
+  }, [anomalies]);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Anomaly Detection</div>
+        <div className="page-subtitle">Z-Score anomaly detection across all strikes · Points outside the green box are flagged</div>
+      </div>
+      <div className="chart-grid two-col">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">OI vs Volume Z-Score Scatter</span>
+            <span className="card-badge badge-ml">Z-SCORE</span>
+          </div>
+          {anomalies ? <div ref={scatterRef} style={{ height: 340 }} /> : <div className="loading"><div className="loading-spinner"/></div>}
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">{t.anomaliesFound}: {anomalies?.total_found ?? '—'}</span>
+            <span className="card-badge badge-ml">LIVE SCAN</span>
+          </div>
+          <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+            {anomalies?.anomalies?.map((a, i) => (
+              <div key={i} className="anomaly-item">
+                <div className="anomaly-strike">{a.strike}</div>
+                <div>
+                  <span className={`anomaly-type-badge ${a.anomaly_type}`}>{a.anomaly_type.replace('_', ' ')}</span>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {a.expiry} · IV: {(a.iv * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div className="anomaly-scores">
+                  <div className="anomaly-score-item">
+                    <div className="anomaly-score-label">OI Z</div>
+                    <div className="anomaly-score-val" style={{ color: Math.abs(a.oi_zscore) > 2.5 ? 'var(--accent-red)' : 'var(--accent3)' }}>
+                      {a.oi_zscore > 0 ? '+' : ''}{a.oi_zscore}
+                    </div>
+                  </div>
+                  <div className="anomaly-score-item">
+                    <div className="anomaly-score-label">VOL Z</div>
+                    <div className="anomaly-score-val" style={{ color: Math.abs(a.vol_zscore) > 2.5 ? 'var(--accent-red)' : 'var(--accent2)' }}>
+                      {a.vol_zscore > 0 ? '+' : ''}{a.vol_zscore}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AIPage({ lang, isOnline }) {
+  const t = T[lang];
+  const [messages, setMessages] = useState([{
+    role: 'ai',
+    text: isOnline
+      ? "Hello! I'm your options market AI assistant powered by Mistral-7B. Ask me anything about IV, Greeks, strategies, or the current market."
+      : "Hello! I'm your options market AI assistant. The backend is currently offline — start it with:\n\ncd codeforge\nuvicorn backend:app --reload --port 8000\n\nOnce connected, I'll be powered by Mistral-7B via Hugging Face.",
+  }]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef();
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(p => [...p, { role: 'user', text: userMsg }]);
+    setLoading(true);
+    const res = await api('/ai/insight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: userMsg }),
+    });
+    setMessages(p => [...p, { role: 'ai', text: res?.insight || 'AI service unavailable. Please retry.' }]);
+    setLoading(false);
+  };
+
+  const suggestions = [
+    'What is IV crush?', 'Explain gamma squeeze', 'When to buy vs sell options?', 'What does high PCR mean?',
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">AI Market Insight</div>
+        <div className="page-subtitle">
+          {isOnline ? 'Powered by Mistral-7B via Hugging Face · Free tier' : '⚠️ Backend offline — start backend to enable AI'}
+        </div>
+      </div>
+      <div className="card" style={{ maxWidth: 760 }}>
+        <div className="card-header">
+          <span className="card-title">🤖 Options AI Assistant</span>
+          <span className={`card-badge ${isOnline ? 'badge-ai' : 'badge-mock'}`}>{isOnline ? 'MISTRAL-7B' : 'OFFLINE'}</span>
+        </div>
+        <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {suggestions.map((s, i) => (
+            <button key={i} className="suggestion-btn" onClick={() => setInput(s)}>{s}</button>
+          ))}
+        </div>
+        <div className="ai-chat-container" style={{ minHeight: 300, maxHeight: 400, overflowY: 'auto', paddingRight: 4 }}>
+          {messages.map((m, i) => (
+            <div key={i} className={`ai-message ${m.role}`} style={{ whiteSpace: 'pre-wrap' }}>
+              {m.role === 'ai' && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)', marginBottom: 6 }}>◆ OPTIONS AI</div>}
+              {m.text}
+            </div>
+          ))}
+          {loading && (
+            <div className="ai-message ai">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)', marginBottom: 6 }}>◆ OPTIONS AI</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div className="loading-spinner" style={{ width: 14, height: 14 }} />
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Thinking...</span>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <div className="ai-input-row">
+          <input
+            className="ai-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && send()}
+            placeholder={t.askAI}
+          />
+          <button className="ai-send-btn" onClick={send} disabled={loading || !input.trim()}>{t.send}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [page, setPage] = useState('dashboard');
+  const [lang, setLang] = useState('en');
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const t = T[lang];
+
+  // Check backend status
+  useEffect(() => {
+    const check = () => {
+      fetch(`${BASE_URL}/`, { signal: AbortSignal.timeout(2000) })
+        .then(() => setIsOnline(true))
+        .catch(() => setIsOnline(false));
+    };
+    check();
+    const id = setInterval(check, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Animated particle background
+  useEffect(() => {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const particles = Array.from({ length: 55 }, () => ({
+      x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.4, opacity: Math.random() * 0.5 + 0.1,
+    }));
+
+    let raf;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(99,102,241,${p.opacity})`;
+        ctx.fill();
+      });
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(99,102,241,${0.08 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.5; ctx.stroke();
+          }
+        }
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+  }, []);
+
+  const pages = [
+    { key: 'dashboard',   label: t.dashboard },
+    { key: 'fingerprint', label: t.fingerprint },
+    { key: 'trap',        label: t.trap },
+    { key: 'anomaly',     label: t.anomaly },
+    { key: 'ai',          label: t.ai },
+  ];
+
+  return (
+    <div>
+      {/* NAVBAR */}
+      <nav className="navbar">
+        <div className="nav-logo">Options<span>AI</span></div>
+        <div className="nav-center">
+          {pages.map(p => (
+            <button key={p.key} className={`nav-tab${page === p.key ? ' active' : ''}`} onClick={() => setPage(p.key)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="nav-right">
+          {['en', 'hi', 'mr'].map(l => (
+            <button key={l} className={`lang-btn${lang === l ? ' active' : ''}`} onClick={() => setLang(l)}>
+              {l === 'en' ? 'EN' : l === 'hi' ? 'हि' : 'म'}
+            </button>
+          ))}
+          <div className="live-badge">
+            <div className="live-dot" style={{ background: isOnline ? 'var(--accent-green)' : 'var(--accent-yellow)' }} />
+            {isOnline ? 'LIVE' : 'DEMO'}
+          </div>
+        </div>
+      </nav>
+
+      {/* STATUS BANNER */}
+      <div className={`status-banner ${isOnline ? 'online' : 'offline'}`}>
+        <span>{isOnline ? '🟢' : '🟡'}</span>
+        <span>{isOnline ? t.backendOnline : t.backendOffline}</span>
+      </div>
+
+      {/* MAIN */}
+      <div className="main">
+        {/* SIDEBAR */}
+        <aside className="sidebar">
+          <div className="filter-group">
+            <label>{t.selectUnderlying}</label>
+            <select className="filter-select">
+              <option>NIFTY</option><option>BANKNIFTY</option>
+              <option>FINNIFTY</option><option>SENSEX</option>
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>{t.selectExpiry}</label>
+            <select className="filter-select">
+              {EXPIRIES.map(e => <option key={e}>{e}</option>)}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>{t.dateRange}</label>
+            <input type="date" className="filter-input" defaultValue="2025-01-01" />
+            <div style={{ height: 6 }} />
+            <input type="date" className="filter-input" defaultValue="2025-01-15" />
+          </div>
+
+          <div className="sidebar-divider" />
+
+          <div className="stat-mini">
+            <div className="stat-mini-row">
+              <span className="stat-mini-label">BACKEND</span>
+              <span className="stat-mini-value" style={{ fontSize: 11, color: isOnline ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
+                {isOnline ? '● ONLINE' : '● OFFLINE'}
+              </span>
+            </div>
+            <div className="stat-mini-row">
+              <span className="stat-mini-label">AI ENGINE</span>
+              <span className="stat-mini-value" style={{ fontSize: 11, color: 'var(--accent)' }}>MISTRAL-7B</span>
+            </div>
+            <div className="stat-mini-row">
+              <span className="stat-mini-label">ML MODEL</span>
+              <span className="stat-mini-value" style={{ fontSize: 11, color: 'var(--accent2)' }}>SKLEARN</span>
+            </div>
+            <div className="stat-mini-row">
+              <span className="stat-mini-label">TRANSLATE</span>
+              <span className="stat-mini-value" style={{ fontSize: 11, color: 'var(--accent3)' }}>MYMEMORY</span>
+            </div>
+          </div>
+
+          <div className="sidebar-divider" />
+
+          <button className="refresh-btn" onClick={() => setLastRefresh(new Date())}>{t.refresh}</button>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>
+            {lastRefresh.toLocaleTimeString()}
+          </div>
+        </aside>
+
+        {/* CONTENT */}
+        <main className="content">
+          {page === 'dashboard'   && <DashboardPage   lang={lang} isOnline={isOnline} key={`dash-${lastRefresh}`} />}
+          {page === 'fingerprint' && <FingerprintPage lang={lang} />}
+          {page === 'trap'        && <TrapPage        lang={lang} />}
+          {page === 'anomaly'     && <AnomalyPage     lang={lang} />}
+          {page === 'ai'          && <AIPage          lang={lang} isOnline={isOnline} />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
