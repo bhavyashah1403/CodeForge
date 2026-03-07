@@ -2,12 +2,15 @@
 Analytics Module
 ────────────────
 AI-powered anomaly detection, pattern analysis, and market insights.
-Uses Scikit-learn Isolation Forest for unsupervised anomaly detection.
+Uses Scikit-learn Isolation Forest for unsupervised anomaly detection,
+KMeans clustering for activity patterns, and statistical methods for
+volatility skew/smile detection plus time-series pattern recognition.
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from config import (
     ISOLATION_FOREST_CONTAMINATION,
@@ -400,9 +403,390 @@ def analytics_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     df = detect_anomalies_isolation_forest(df)
     df = detect_volume_spikes(df)
     df = detect_unusual_oi_changes(df)
+    df = cluster_market_activity(df)
 
     print("=" * 60 + "\n")
     return df
+
+
+# ═══════════════════════════════════════════════════════════
+#  KMEANS CLUSTERING (Strike × Expiry Activity Patterns)
+# ═══════════════════════════════════════════════════════════
+
+def cluster_market_activity(
+    df: pd.DataFrame,
+    n_clusters: int = 4,
+) -> pd.DataFrame:
+    """
+    Cluster market activity patterns across strikes/expiries using KMeans.
+    Identifies groups: high-activity, low-activity, hedging zones, speculative zones.
+    """
+    print("[Analytics] Running KMeans clustering on market activity...")
+
+    features = ["total_oi", "total_volume", "pcr_oi", "CE", "PE"]
+    available = [f for f in features if f in df.columns]
+    if len(available) < 2:
+        df["activity_cluster"] = 0
+        return df
+
+    X = df[available].copy().fillna(0)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    df["activity_cluster"] = kmeans.fit_predict(X_scaled)
+
+    # Label clusters by mean total_volume
+    cluster_means = df.groupby("activity_cluster")["total_volume"].mean()
+    rank = cluster_means.rank(ascending=True).astype(int)
+    label_map = {c: ["Low Activity", "Moderate Activity", "High Activity", "Extreme Activity"][min(r - 1, 3)]
+                 for c, r in rank.items()}
+    df["cluster_label"] = df["activity_cluster"].map(label_map)
+
+    for label, count in df["cluster_label"].value_counts().items():
+        print(f"[Analytics]   {label}: {count:,} rows")
+
+    return df
+
+
+# ═══════════════════════════════════════════════════════════
+#  VOLATILITY SKEW / SMILE PATTERN DETECTION
+# ═══════════════════════════════════════════════════════════
+
+def detect_volatility_patterns(df: pd.DataFrame) -> dict:
+    """
+    Detect volatility skew/smile patterns from IV data.
+    Returns structured pattern analysis.
+    """
+    print("[Analytics] Detecting volatility patterns...")
+
+    patterns = {
+        "skew_detected": False,
+        "smile_detected": False,
+        "skew_direction": None,
+        "smile_curvature": None,
+        "iv_term_structure": [],
+        "skew_by_expiry": [],
+    }
+
+    if "iv_CE" not in df.columns or "iv_PE" not in df.columns:
+        return patterns
+
+    # Get latest timestamp for snapshot analysis
+    latest_ts = df["datetime"].max()
+    snapshot = df[df["datetime"] == latest_ts].copy()
+    snapshot = snapshot.dropna(subset=["iv_CE", "iv_PE"])
+
+    if len(snapshot) < 5:
+        return patterns
+
+    # Sort by strike
+    snapshot = snapshot.sort_values("strike")
+
+    # ── 1. Skew Detection ───────────────────────────
+    # Compare OTM put IV vs OTM call IV
+    atm = snapshot["ATM"].iloc[0]
+    otm_puts = snapshot[snapshot["strike"] < atm * 0.98]
+    otm_calls = snapshot[snapshot["strike"] > atm * 1.02]
+
+    if len(otm_puts) > 0 and len(otm_calls) > 0:
+        put_iv_mean = otm_puts["iv_PE"].mean()
+        call_iv_mean = otm_calls["iv_CE"].mean()
+
+        if put_iv_mean > 0 and call_iv_mean > 0:
+            skew_ratio = put_iv_mean / call_iv_mean
+            patterns["skew_detected"] = abs(skew_ratio - 1.0) > 0.1
+            patterns["skew_direction"] = "put_skew" if skew_ratio > 1.1 else (
+                "call_skew" if skew_ratio < 0.9 else "neutral"
+            )
+            patterns["skew_ratio"] = round(float(skew_ratio), 4)
+            patterns["otm_put_iv_avg"] = round(float(put_iv_mean * 100), 2)
+            patterns["otm_call_iv_avg"] = round(float(call_iv_mean * 100), 2)
+
+    # ── 2. Smile Detection ──────────────────────────
+    # Fit quadratic to IV vs moneyness to detect curvature
+    if "relative_strike" in snapshot.columns:
+        iv_avg = snapshot["iv_avg"].dropna()
+        rel_strike = snapshot.loc[iv_avg.index, "relative_strike"]
+
+        if len(iv_avg) > 3:
+            try:
+                coeffs = np.polyfit(rel_strike, iv_avg, 2)
+                curvature = coeffs[0]  # quadratic coefficient
+                patterns["smile_detected"] = curvature > 0.05
+                patterns["smile_curvature"] = round(float(curvature), 6)
+                patterns["smile_vertex"] = round(float(-coeffs[1] / (2 * coeffs[0])), 4) if coeffs[0] != 0 else 0
+            except (np.linalg.LinAlgError, ValueError):
+                pass
+
+    # ── 3. IV Term Structure (across expiries) ──────
+    for expiry in df["expiry"].unique():
+        exp_data = df[(df["expiry"] == expiry) & (df["datetime"] == latest_ts)]
+        exp_data = exp_data.dropna(subset=["iv_CE", "iv_PE"])
+        if len(exp_data) > 0:
+            patterns["iv_term_structure"].append({
+                "expiry": str(expiry),
+                "mean_iv_CE": round(float(exp_data["iv_CE"].mean() * 100), 2),
+                "mean_iv_PE": round(float(exp_data["iv_PE"].mean() * 100), 2),
+                "atm_iv": round(float(exp_data.loc[
+                    (exp_data["strike"] - exp_data["ATM"]).abs().idxmin(), "iv_avg"
+                ] * 100), 2) if len(exp_data) > 0 else None,
+            })
+
+    # ── 4. Skew by Expiry ───────────────────────────
+    for expiry in df["expiry"].unique():
+        exp_data = df[(df["expiry"] == expiry) & (df["datetime"] == latest_ts)]
+        exp_data = exp_data.dropna(subset=["iv_CE", "iv_PE"]).sort_values("strike")
+        if len(exp_data) > 5:
+            atm_e = exp_data["ATM"].iloc[0]
+            puts_e = exp_data[exp_data["strike"] < atm_e * 0.98]["iv_PE"]
+            calls_e = exp_data[exp_data["strike"] > atm_e * 1.02]["iv_CE"]
+            if len(puts_e) > 0 and len(calls_e) > 0:
+                patterns["skew_by_expiry"].append({
+                    "expiry": str(expiry),
+                    "put_iv_avg": round(float(puts_e.mean() * 100), 2),
+                    "call_iv_avg": round(float(calls_e.mean() * 100), 2),
+                    "skew": round(float((puts_e.mean() - calls_e.mean()) * 100), 2),
+                })
+
+    return patterns
+
+
+# ═══════════════════════════════════════════════════════════
+#  IV SPIKE / SHIFT DETECTION
+# ═══════════════════════════════════════════════════════════
+
+def detect_iv_spikes(df: pd.DataFrame, threshold: float = 2.0) -> list[dict]:
+    """
+    Detect sudden spikes or shifts in implied volatility.
+    Compares IV changes across consecutive timestamps per strike.
+    """
+    print("[Analytics] Detecting IV spikes/shifts...")
+
+    spikes = []
+    if "iv_CE" not in df.columns:
+        return spikes
+
+    sorted_df = df.sort_values(["strike", "expiry", "datetime"]).copy()
+
+    for iv_col, opt_type in [("iv_CE", "Call"), ("iv_PE", "Put")]:
+        grouped = sorted_df.groupby(["strike", "expiry"])[iv_col]
+        iv_change = grouped.diff()
+        iv_mean = grouped.transform("mean")
+        iv_std = grouped.transform("std").fillna(0.001)
+
+        z_scores = (iv_change / iv_std).fillna(0)
+        spike_mask = z_scores.abs() > threshold
+
+        spike_rows = sorted_df[spike_mask].head(50)  # top 50 spikes
+        for _, row in spike_rows.iterrows():
+            spikes.append({
+                "datetime": str(row["datetime"]),
+                "strike": float(row["strike"]),
+                "expiry": str(row["expiry"]),
+                "option_type": opt_type,
+                "iv_value": round(float(row[iv_col] * 100), 2) if pd.notna(row[iv_col]) else None,
+                "iv_change_zscore": round(float(z_scores.loc[row.name]), 2),
+                "severity": "high" if abs(z_scores.loc[row.name]) > 3 else "medium",
+            })
+
+    spikes.sort(key=lambda x: abs(x.get("iv_change_zscore", 0)), reverse=True)
+    print(f"[Analytics] Found {len(spikes)} IV spike events")
+    return spikes[:30]
+
+
+# ═══════════════════════════════════════════════════════════
+#  AI-DRIVEN INSIGHT GENERATION
+# ═══════════════════════════════════════════════════════════
+
+def generate_ai_insights(df: pd.DataFrame) -> list[dict]:
+    """
+    Generate actionable AI-driven insights from analyzed data.
+    Combines anomaly detection, volume analysis, OI patterns,
+    volatility patterns, and sentiment analysis.
+    """
+    print("[Analytics] Generating AI insights...")
+    insights = []
+    insight_id = 1
+
+    latest_ts = df["datetime"].max()
+    latest = df[df["datetime"] == latest_ts]
+
+    # ── 1. Sentiment Analysis ────────────────────────
+    if "pcr_oi" in df.columns:
+        pcr_mean = latest["pcr_oi"].mean()
+        pcr_prev = df[df["datetime"] < latest_ts].groupby("datetime")["pcr_oi"].mean()
+        if len(pcr_prev) > 1:
+            pcr_prev_val = pcr_prev.iloc[-1] if len(pcr_prev) > 0 else pcr_mean
+            pcr_change = pcr_mean - pcr_prev_val
+
+            if abs(pcr_change) > 0.1:
+                direction = "bullish" if pcr_change > 0 else "bearish"
+                insights.append({
+                    "id": insight_id, "type": direction,
+                    "title": "Sentiment Shift Detected",
+                    "description": f"PCR moved from {pcr_prev_val:.2f} to {pcr_mean:.2f} "
+                                   f"({'increased' if pcr_change > 0 else 'decreased'} by {abs(pcr_change):.2f}). "
+                                   f"This suggests a shift toward {'bullish' if pcr_change > 0 else 'bearish'} sentiment "
+                                   f"as {'puts' if pcr_change > 0 else 'calls'} are being {'written' if pcr_change > 0 else 'bought'} aggressively.",
+                    "timestamp": str(latest_ts),
+                    "severity": "high" if abs(pcr_change) > 0.3 else "medium",
+                })
+                insight_id += 1
+
+    # ── 2. Anomaly Hotspots ──────────────────────────
+    if "is_anomaly" in df.columns:
+        anomalies = latest[latest["is_anomaly"] == True]
+        if len(anomalies) > 0:
+            top_anomaly = anomalies.nsmallest(1, "anomaly_score").iloc[0]
+            anomaly_strikes = anomalies["strike"].value_counts().head(3)
+            strike_list = ", ".join([str(int(s)) for s in anomaly_strikes.index])
+
+            insights.append({
+                "id": insight_id, "type": "anomaly",
+                "title": "Anomaly Detected",
+                "description": f"AI detected {len(anomalies)} anomalous data points at the latest timestamp. "
+                               f"Most anomalous strike: {int(top_anomaly['strike'])} with score {top_anomaly['anomaly_score']:.4f}. "
+                               f"Top affected strikes: {strike_list}. "
+                               f"This may indicate unusual institutional activity or hedging.",
+                "timestamp": str(latest_ts),
+                "severity": "high",
+            })
+            insight_id += 1
+
+    # ── 3. Volume Spike Alerts ───────────────────────
+    if "volume_spike_any" in df.columns:
+        spikes = latest[latest["volume_spike_any"] == True]
+        if len(spikes) > 0:
+            top_spike = spikes.nlargest(1, "total_volume").iloc[0]
+            insights.append({
+                "id": insight_id, "type": "spike",
+                "title": "Volume Spike Alert",
+                "description": f"Detected {len(spikes)} volume spikes. "
+                               f"Highest at strike {int(top_spike['strike'])} with "
+                               f"CE vol: {int(top_spike['volume_CE']):,}, PE vol: {int(top_spike['volume_PE']):,}. "
+                               f"This suggests significant directional interest at these levels.",
+                "timestamp": str(latest_ts),
+                "severity": "high" if len(spikes) > 5 else "medium",
+            })
+            insight_id += 1
+
+    # ── 4. Max Pain Analysis ─────────────────────────
+    max_pain = compute_max_pain(df)
+    if max_pain:
+        mp_strike = max_pain["max_pain_strike"]
+        spot = max_pain["spot_price"]
+        distance = max_pain["distance_from_spot"]
+        insights.append({
+            "id": insight_id, "type": "info",
+            "title": "Max Pain Analysis",
+            "description": f"Max Pain is at {int(mp_strike)} for the current data. "
+                           f"Spot ({spot:.1f}) is {abs(distance):.0f} points "
+                           f"{'above' if distance < 0 else 'below'} Max Pain. "
+                           f"Markets tend to gravitate toward Max Pain near expiry.",
+            "timestamp": str(latest_ts),
+            "severity": "low",
+        })
+        insight_id += 1
+
+    # ── 5. OI Build-up / Support-Resistance ──────────
+    if len(latest) > 0:
+        oi_by_strike = latest.groupby("strike").agg(
+            oi_CE=("oi_CE", "sum"), oi_PE=("oi_PE", "sum")
+        ).reset_index()
+
+        if len(oi_by_strike) > 0:
+            max_ce_oi_strike = oi_by_strike.loc[oi_by_strike["oi_CE"].idxmax()]
+            max_pe_oi_strike = oi_by_strike.loc[oi_by_strike["oi_PE"].idxmax()]
+
+            insights.append({
+                "id": insight_id, "type": "bearish",
+                "title": "Resistance Level (Call OI)",
+                "description": f"Highest Call OI build-up at strike {int(max_ce_oi_strike['strike'])} "
+                               f"with {int(max_ce_oi_strike['oi_CE']):,} contracts. "
+                               f"Heavy Call writing indicates this may act as strong resistance.",
+                "timestamp": str(latest_ts),
+                "severity": "medium",
+            })
+            insight_id += 1
+
+            insights.append({
+                "id": insight_id, "type": "bullish",
+                "title": "Support Level (Put OI)",
+                "description": f"Highest Put OI build-up at strike {int(max_pe_oi_strike['strike'])} "
+                               f"with {int(max_pe_oi_strike['oi_PE']):,} contracts. "
+                               f"Heavy Put writing suggests strong support at this level.",
+                "timestamp": str(latest_ts),
+                "severity": "medium",
+            })
+            insight_id += 1
+
+    # ── 6. Volatility Pattern Alerts ─────────────────
+    vol_patterns = detect_volatility_patterns(df)
+    if vol_patterns.get("skew_detected"):
+        direction = vol_patterns["skew_direction"]
+        ratio = vol_patterns.get("skew_ratio", 0)
+        insights.append({
+            "id": insight_id, "type": "volatility",
+            "title": "Volatility Skew Detected",
+            "description": f"{'Put' if direction == 'put_skew' else 'Call'} skew detected with ratio {ratio:.2f}. "
+                           f"OTM Put IV: {vol_patterns.get('otm_put_iv_avg', 0):.1f}%, "
+                           f"OTM Call IV: {vol_patterns.get('otm_call_iv_avg', 0):.1f}%. "
+                           f"{'Higher put IV suggests crash protection demand.' if direction == 'put_skew' else 'Higher call IV suggests upside demand.'}",
+            "timestamp": str(latest_ts),
+            "severity": "high",
+        })
+        insight_id += 1
+
+    if vol_patterns.get("smile_detected"):
+        curvature = vol_patterns.get("smile_curvature", 0)
+        insights.append({
+            "id": insight_id, "type": "volatility",
+            "title": "Volatility Smile Pattern",
+            "description": f"Volatility smile detected with curvature coefficient {curvature:.4f}. "
+                           f"Both OTM puts and OTM calls have elevated IV relative to ATM options. "
+                           f"This indicates market uncertainty about direction but expectation of a large move.",
+            "timestamp": str(latest_ts),
+            "severity": "medium",
+        })
+        insight_id += 1
+
+    # ── 7. Cluster-based Insights ────────────────────
+    if "cluster_label" in df.columns:
+        cluster_dist = latest["cluster_label"].value_counts()
+        extreme = cluster_dist.get("Extreme Activity", 0)
+        if extreme > 0:
+            extreme_strikes = latest[latest["cluster_label"] == "Extreme Activity"]["strike"].unique()
+            strike_list = ", ".join([str(int(s)) for s in sorted(extreme_strikes)[:5]])
+            insights.append({
+                "id": insight_id, "type": "spike",
+                "title": "Extreme Activity Cluster",
+                "description": f"KMeans clustering identified {extreme} data points with extreme activity. "
+                               f"Key strikes: {strike_list}. "
+                               f"These areas show unusually high combined volume and OI, "
+                               f"suggesting concentrated institutional positioning.",
+                "timestamp": str(latest_ts),
+                "severity": "high" if extreme > 3 else "medium",
+            })
+            insight_id += 1
+
+    # ── 8. IV Spike Alerts ───────────────────────────
+    iv_spikes = detect_iv_spikes(df)
+    if iv_spikes:
+        top_spike = iv_spikes[0]
+        insights.append({
+            "id": insight_id, "type": "volatility",
+            "title": "IV Spike Detected",
+            "description": f"Sudden IV shift at strike {int(top_spike['strike'])} ({top_spike['option_type']}). "
+                           f"IV: {top_spike['iv_value']}%, z-score: {top_spike['iv_change_zscore']:.1f}. "
+                           f"Rapid IV changes suggest evolving market expectations or event-driven trading.",
+            "timestamp": top_spike["datetime"],
+            "severity": top_spike["severity"],
+        })
+        insight_id += 1
+
+    print(f"[Analytics] Generated {len(insights)} AI insights")
+    return insights
 
 
 if __name__ == "__main__":

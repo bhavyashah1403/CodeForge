@@ -26,6 +26,9 @@ from src.analytics import (
     compute_max_pain,
     get_top_anomalies,
     compute_evaluation_metrics,
+    detect_volatility_patterns,
+    detect_iv_spikes,
+    generate_ai_insights,
 )
 
 # ─── App Setup ───────────────────────────────────────────
@@ -375,6 +378,103 @@ def get_oi_heatmap(oi_type: str = "oi_CE", expiry: str = None):
         "strikes": pivot.index.tolist(),
         "timestamps": [str(t) for t in pivot.columns],
         "values": pivot.values.tolist(),
+    }
+
+
+# ── 18. AI-DRIVEN INSIGHTS ──────────────────────────────
+@app.get("/api/ai-insights", tags=["AI / ML"])
+def get_ai_insights(expiry: str = None):
+    """AI-generated market insights from anomaly detection, clustering, and volatility analysis."""
+    data = _df.copy()
+    if expiry:
+        data = data[data["expiry"].dt.strftime("%Y-%m-%d") == expiry]
+    insights = generate_ai_insights(data)
+    return insights
+
+
+# ── 19. VOLATILITY SURFACE ──────────────────────────────
+@app.get("/api/volatility-surface", tags=["Volatility"])
+def get_volatility_surface(expiry: str = None):
+    """3D volatility surface data (strike × expiry × IV)."""
+    data = _df.copy()
+    if expiry:
+        data = data[data["expiry"].dt.strftime("%Y-%m-%d") == expiry]
+
+    # Use latest timestamp per expiry
+    latest_per_expiry = data.groupby("expiry")["datetime"].max().reset_index()
+    surface_data = []
+
+    for _, row in latest_per_expiry.iterrows():
+        exp = row["expiry"]
+        ts = row["datetime"]
+        snap = data[(data["expiry"] == exp) & (data["datetime"] == ts)]
+        snap = snap.dropna(subset=["iv_CE"])
+        snap = snap[(snap["iv_CE"] > 0.01) & (snap["iv_CE"] < 3.0)]
+
+        for _, s in snap.iterrows():
+            surface_data.append({
+                "strike": float(s["strike"]),
+                "expiry": str(exp),
+                "iv_CE": round(float(s["iv_CE"] * 100), 2) if pd.notna(s["iv_CE"]) else None,
+                "iv_PE": round(float(s["iv_PE"] * 100), 2) if pd.notna(s["iv_PE"]) else None,
+                "iv_avg": round(float(s["iv_avg"] * 100), 2) if pd.notna(s["iv_avg"]) else None,
+                "time_to_expiry": round(float(s["time_to_expiry_days"]), 1) if "time_to_expiry_days" in s.index else None,
+            })
+
+    return surface_data
+
+
+# ── 20. VOLUME SURFACE ──────────────────────────────────
+@app.get("/api/volume-surface", tags=["Analytics"])
+def get_volume_surface(expiry: str = None):
+    """Volume distribution surface (strike × time)."""
+    data = _df.copy()
+    if expiry:
+        data = data[data["expiry"].dt.strftime("%Y-%m-%d") == expiry]
+
+    surface = data.groupby(["strike", "datetime"]).agg(
+        volume_CE=("volume_CE", "sum"),
+        volume_PE=("volume_PE", "sum"),
+        total_volume=("total_volume", "sum"),
+    ).reset_index()
+
+    # Subsample for performance
+    if len(surface) > 5000:
+        times = sorted(surface["datetime"].unique())
+        step = max(1, len(times) // 50)
+        sampled_times = times[::step]
+        surface = surface[surface["datetime"].isin(sampled_times)]
+
+    return df_to_json(surface)
+
+
+# ── 21. PATTERN ANALYSIS ────────────────────────────────
+@app.get("/api/pattern-analysis", tags=["AI / ML"])
+def get_pattern_analysis(expiry: str = None):
+    """Comprehensive volatility pattern and clustering analysis."""
+    data = _df.copy()
+    if expiry:
+        data = data[data["expiry"].dt.strftime("%Y-%m-%d") == expiry]
+
+    patterns = detect_volatility_patterns(data)
+    iv_spikes = detect_iv_spikes(data)
+
+    # Cluster distribution
+    cluster_dist = {}
+    if "cluster_label" in data.columns:
+        cluster_dist = data["cluster_label"].value_counts().to_dict()
+
+    # Anomaly distribution by strike
+    anomaly_by_strike = {}
+    if "is_anomaly" in data.columns:
+        anom = data[data["is_anomaly"] == True].groupby("strike").size()
+        anomaly_by_strike = {str(int(k)): int(v) for k, v in anom.head(20).items()}
+
+    return {
+        "volatility_patterns": patterns,
+        "iv_spikes": iv_spikes,
+        "cluster_distribution": cluster_dist,
+        "anomaly_by_strike": anomaly_by_strike,
     }
 
 
