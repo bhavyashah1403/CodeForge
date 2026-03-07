@@ -3,15 +3,15 @@ import axios from 'axios';
 /**
  * API Service for CodeForge Options Market Analytics
  *
- * Base URL is read from the VITE_API_BASE_URL environment variable.
- * Update .env to point to your backend.
+ * Uses Vite proxy in dev (/api -> http://localhost:8000/api)
+ * In production, set VITE_API_BASE_URL to your backend URL.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,21 +29,54 @@ api.interceptors.response.use(
 // ── API Endpoints ────────────────────────────────────────────────
 
 export const fetchMarketSummary = (params = {}) =>
-  api.get('/market-summary', { params });
+  api.get('/key-metrics', { params: { expiry: params.expiry } });
 
 export const fetchOpenInterest = (params = {}) =>
-  api.get('/open-interest', { params });
+  api.get('/oi-distribution', { params: { expiry: params.expiry } });
 
 export const fetchVolatilitySmile = (params = {}) =>
-  api.get('/volatility-smile', { params });
+  api.get('/volatility-smile', { params: { expiry: params.expiry } });
 
 export const fetchVolumeHeatmap = (params = {}) =>
-  api.get('/volume-heatmap', { params });
+  api.get('/oi-heatmap', { params: { expiry: params.expiry } });
 
 export const fetchAIInsights = (params = {}) =>
-  api.get('/ai-insights', { params });
+  api.get('/ai-insights', { params: { expiry: params.expiry } });
 
 export const fetchCumulativeOI = (params = {}) =>
-  api.get('/cumulative-oi', { params });
+  api.get('/pcr', { params: { expiry: params.expiry } });
+
+export const fetchAnomalies = (params = {}) =>
+  api.get('/anomalies', { params: { expiry: params.expiry, n: params.n || 50 } });
+
+export const fetchAnomalyScatter = (params = {}) =>
+  api.get('/anomaly-scatter', { params: { expiry: params.expiry } });
+
+export const fetchVolumeSpikes = (params = {}) =>
+  api.get('/volume-spikes', { params: { expiry: params.expiry } });
+
+export const fetchGreeks = (params = {}) =>
+  api.get('/greeks', { params: { expiry: params.expiry } });
+
+export const fetchMaxPain = (params = {}) =>
+  api.get('/max-pain', { params: { expiry: params.expiry } });
+
+export const fetchVolatilitySurface = (params = {}) =>
+  api.get('/volatility-surface', { params: { expiry: params.expiry } });
+
+export const fetchVolumeSurface = (params = {}) =>
+  api.get('/volume-surface', { params: { expiry: params.expiry } });
+
+export const fetchMetrics = () =>
+  api.get('/metrics');
+
+export const fetchSpotPrice = (params = {}) =>
+  api.get('/spot-price', { params: { expiry: params.expiry } });
+
+export const fetchExpiries = () =>
+  api.get('/expiries');
+
+export const fetchPatternAnalysis = (params = {}) =>
+  api.get('/pattern-analysis', { params: { expiry: params.expiry } });
 
 export default api;
