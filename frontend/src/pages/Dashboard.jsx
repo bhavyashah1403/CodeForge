@@ -6,6 +6,9 @@ import {
   PieChart,
   Activity,
   TrendingUp,
+  BarChart3,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,6 +26,11 @@ import Heatmap from '../components/Heatmap';
 import OIDistributionChart from '../components/charts/OIDistributionChart';
 import VolatilitySmileChart from '../components/charts/VolatilitySmileChart';
 import CumulativeOIChart from '../components/charts/CumulativeOIChart';
+import AnomalyScatterChart from '../components/charts/AnomalyScatterChart';
+import GreeksChart from '../components/charts/GreeksChart';
+import PCRTimeseriesChart from '../components/charts/PCRTimeseriesChart';
+import VolatilitySurfaceChart from '../components/charts/VolatilitySurfaceChart';
+import VolumeProfileChart from '../components/charts/VolumeProfileChart';
 
 // API
 import {
@@ -32,6 +40,10 @@ import {
   fetchVolumeHeatmap,
   fetchAIInsights,
   fetchCumulativeOI,
+  fetchAnomalyScatter,
+  fetchGreeks,
+  fetchVolatilitySurface,
+  fetchPatternAnalysis,
 } from '../services/api';
 
 // ── Mock Data (used when backend is unavailable) ─────────────────
@@ -54,7 +66,8 @@ function generateMockVolSmile() {
     const dist = Math.abs(s - 24500) / 1000;
     data.push({
       strike: s,
-      iv: 12 + dist * dist * 1.8 + (Math.random() - 0.5) * 1.5,
+      iv_CE_pct: 12 + dist * dist * 1.8 + (Math.random() - 0.5) * 1.5,
+      iv_PE_pct: 13 + dist * dist * 2.0 + (Math.random() - 0.5) * 1.5,
     });
   }
   return data;
@@ -112,53 +125,17 @@ const mockInsights = [
     type: 'anomaly',
     title: 'Anomaly Detected',
     description:
-      'Strike 25,800 saw a 400% spike in Put Volume at 11:30. This is unusual and may indicate institutional hedging activity.',
-    timestamp: '11:30 AM · 07 Mar 2026',
+      'AI model detected unusual market activity. Connect backend to see real-time insights.',
+    timestamp: new Date().toLocaleString(),
     severity: 'high',
   },
   {
     id: 2,
-    type: 'bullish',
-    title: 'Sentiment Shift',
-    description:
-      'PCR moved from 0.8 to 1.2 in the last hour, suggesting a shift toward bullish sentiment as puts are being written aggressively.',
-    timestamp: '11:15 AM · 07 Mar 2026',
-    severity: 'medium',
-  },
-  {
-    id: 3,
-    type: 'volatility',
-    title: 'Volatility Alert',
-    description:
-      'Volatility skew is increasing — far OTM puts are being bid up, suggesting crash protection demand is rising.',
-    timestamp: '10:45 AM · 07 Mar 2026',
-    severity: 'high',
-  },
-  {
-    id: 4,
-    type: 'spike',
-    title: 'Volume Spike',
-    description:
-      'Call OI at strike 25,000 increased by 1.2M in 30 minutes. Highest activity today.',
-    timestamp: '10:30 AM · 07 Mar 2026',
-    severity: 'medium',
-  },
-  {
-    id: 5,
-    type: 'bearish',
-    title: 'Resistance Build-up',
-    description:
-      'Heavy Call writing observed at 25,500 strike with 2.5M OI. This may act as key resistance.',
-    timestamp: '10:00 AM · 07 Mar 2026',
-    severity: 'low',
-  },
-  {
-    id: 6,
     type: 'info',
-    title: 'Max Pain Analysis',
+    title: 'System Ready',
     description:
-      'Max Pain is at 24,800 for current expiry. Market is currently trading 200 points above Max Pain.',
-    timestamp: '09:30 AM · 07 Mar 2026',
+      'Backend API powers AI-driven insights from anomaly detection, clustering, and volatility analysis.',
+    timestamp: new Date().toLocaleString(),
     severity: 'low',
   },
 ];
@@ -176,13 +153,14 @@ export default function Dashboard() {
   });
 
   const [marketData, setMarketData] = useState({
-    spotPrice: 24587.35,
-    atmStrike: 24600,
-    pcr: 1.14,
-    avgIV: 14.82,
-    spotChange: 0.73,
-    pcrChange: -2.14,
-    ivChange: 1.56,
+    spotPrice: null,
+    atmStrike: null,
+    pcr: null,
+    totalOI: null,
+    totalVolume: null,
+    anomaliesCount: 0,
+    volumeSpikes: 0,
+    sentiment: 'Neutral',
   });
 
   const [oiData, setOiData] = useState([]);
@@ -190,13 +168,25 @@ export default function Dashboard() {
   const [heatmapState, setHeatmapState] = useState({ data: [], times: [], strikes: [] });
   const [cumulativeOI, setCumulativeOI] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [anomalyScatter, setAnomalyScatter] = useState([]);
+  const [greeksData, setGreeksData] = useState([]);
+  const [volSurface, setVolSurface] = useState([]);
+  const [patternData, setPatternData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Format large numbers
+  const fmtNum = (v) => {
+    if (v == null) return '—';
+    if (v >= 1e7) return (v / 1e7).toFixed(2) + ' Cr';
+    if (v >= 1e5) return (v / 1e5).toFixed(2) + ' L';
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    return Number(v).toLocaleString();
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Try fetching from backend — fall back to mock data
-      const [summary, oi, volSmile, heatmap, aiInsights, cumOI] =
+      const [summary, oi, volSmile, heatmap, aiInsights, cumOI, scatter, greeks, surface, patterns] =
         await Promise.allSettled([
           fetchMarketSummary(filters),
           fetchOpenInterest(filters),
@@ -204,53 +194,97 @@ export default function Dashboard() {
           fetchVolumeHeatmap(filters),
           fetchAIInsights(filters),
           fetchCumulativeOI(filters),
+          fetchAnomalyScatter(filters),
+          fetchGreeks(filters),
+          fetchVolatilitySurface(filters),
+          fetchPatternAnalysis(filters),
         ]);
 
-      setMarketData(
-        summary.status === 'fulfilled' && summary.value
-          ? summary.value
-          : {
-              spotPrice: 24587.35,
-              atmStrike: 24600,
-              pcr: 1.14,
-              avgIV: 14.82,
-              spotChange: 0.73,
-              pcrChange: -2.14,
-              ivChange: 1.56,
-            }
-      );
+      // Market Summary
+      if (summary.status === 'fulfilled' && summary.value) {
+        const s = summary.value;
+        setMarketData({
+          spotPrice: s.spot_price,
+          atmStrike: s.atm_strike,
+          pcr: s.pcr_oi,
+          totalOI: s.total_oi,
+          totalVolume: s.total_volume,
+          anomaliesCount: s.anomalies_count || 0,
+          volumeSpikes: s.volume_spikes || 0,
+          sentiment: s.sentiment || 'Neutral',
+        });
+      }
 
+      // OI Distribution
       setOiData(
         oi.status === 'fulfilled' && Array.isArray(oi.value)
           ? oi.value
           : generateMockOI()
       );
 
+      // Volatility Smile
       setVolSmileData(
         volSmile.status === 'fulfilled' && Array.isArray(volSmile.value)
           ? volSmile.value
           : generateMockVolSmile()
       );
 
-      if (heatmap.status === 'fulfilled' && heatmap.value?.data) {
-        setHeatmapState(heatmap.value);
+      // Heatmap
+      if (heatmap.status === 'fulfilled' && heatmap.value?.strikes) {
+        const h = heatmap.value;
+        const heatmapData = [];
+        h.strikes.forEach((strike, si) => {
+          h.timestamps.forEach((ts, ti) => {
+            heatmapData.push({
+              strike,
+              time: new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              volume: h.values[si]?.[ti] || 0,
+            });
+          });
+        });
+        const uniqueTimes = [...new Set(heatmapData.map((d) => d.time))];
+        const uniqueStrikes = [...new Set(heatmapData.map((d) => d.strike))];
+        setHeatmapState({ data: heatmapData, times: uniqueTimes, strikes: uniqueStrikes });
       } else {
         setHeatmapState(generateMockHeatmap());
       }
 
+      // Cumulative OI / PCR Timeseries
       setCumulativeOI(
         cumOI.status === 'fulfilled' && Array.isArray(cumOI.value)
           ? cumOI.value
           : generateMockCumulativeOI()
       );
 
+      // AI Insights
       setInsights(
-        aiInsights.status === 'fulfilled' && Array.isArray(aiInsights.value)
+        aiInsights.status === 'fulfilled' && Array.isArray(aiInsights.value) && aiInsights.value.length > 0
           ? aiInsights.value
           : mockInsights
       );
+
+      // Anomaly Scatter
+      setAnomalyScatter(
+        scatter.status === 'fulfilled' && Array.isArray(scatter.value)
+          ? scatter.value.filter((d) => d.total_volume > 0).slice(0, 2000)
+          : []
+      );
+
+      // Greeks
+      setGreeksData(
+        greeks.status === 'fulfilled' && Array.isArray(greeks.value) ? greeks.value : []
+      );
+
+      // Volatility Surface
+      setVolSurface(
+        surface.status === 'fulfilled' && Array.isArray(surface.value) ? surface.value : []
+      );
+
+      // Pattern Analysis
+      setPatternData(
+        patterns.status === 'fulfilled' && patterns.value ? patterns.value : null
+      );
     } catch {
-      // Full fallback
       setOiData(generateMockOI());
       setVolSmileData(generateMockVolSmile());
       setHeatmapState(generateMockHeatmap());
@@ -293,45 +327,93 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricCard
                 label="Spot Price"
-                value={marketData.spotPrice}
-                change={marketData.spotChange}
+                value={marketData.spotPrice?.toLocaleString() ?? '—'}
+                change={0}
                 icon={<DollarSign size={18} />}
                 color="--green"
                 delay={0}
               />
               <MetricCard
                 label="ATM Strike"
-                value={marketData.atmStrike}
-                change={0.0}
+                value={marketData.atmStrike?.toLocaleString() ?? '—'}
+                change={0}
                 icon={<Target size={18} />}
                 color="--blue"
                 delay={0.1}
               />
               <MetricCard
                 label="Put Call Ratio"
-                value={marketData.pcr}
-                change={marketData.pcrChange}
+                value={marketData.pcr?.toFixed(3) ?? '—'}
+                change={0}
                 icon={<PieChart size={18} />}
                 color="--cyan"
                 delay={0.2}
               />
               <MetricCard
-                label="Avg Implied Volatility"
-                value={`${marketData.avgIV}%`}
-                change={marketData.ivChange}
+                label="Sentiment"
+                value={marketData.sentiment}
+                change={
+                  marketData.sentiment === 'Bullish'
+                    ? 1
+                    : marketData.sentiment === 'Bearish'
+                    ? -1
+                    : 0
+                }
                 icon={<Activity size={18} />}
-                color="--yellow"
+                color={
+                  marketData.sentiment === 'Bullish'
+                    ? '--green'
+                    : marketData.sentiment === 'Bearish'
+                    ? '--red'
+                    : '--yellow'
+                }
                 delay={0.3}
+              />
+            </div>
+
+            {/* Secondary metrics row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              <MetricCard
+                label="Total Open Interest"
+                value={fmtNum(marketData.totalOI)}
+                change={0}
+                icon={<BarChart3 size={18} />}
+                color="--blue"
+                delay={0.4}
+              />
+              <MetricCard
+                label="Total Volume"
+                value={fmtNum(marketData.totalVolume)}
+                change={0}
+                icon={<TrendingUp size={18} />}
+                color="--cyan"
+                delay={0.5}
+              />
+              <MetricCard
+                label="Anomalies Detected"
+                value={marketData.anomaliesCount.toLocaleString()}
+                change={0}
+                icon={<AlertTriangle size={18} />}
+                color="--yellow"
+                delay={0.6}
+              />
+              <MetricCard
+                label="Volume Spikes"
+                value={marketData.volumeSpikes.toLocaleString()}
+                change={0}
+                icon={<Zap size={18} />}
+                color="--red"
+                delay={0.7}
               />
             </div>
           </section>
 
-          {/* ROW 2: Structural Market Insights */}
+          {/* ROW 2: OI & Volume Distribution */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-5 rounded-full bg-[var(--cyan)]" />
               <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                Structural Market Insights
+                Open Interest & Volume Distribution
               </h2>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -344,16 +426,83 @@ export default function Dashboard() {
               </ChartCard>
 
               <ChartCard
-                title="Volatility Smile"
-                subtitle="Strike vs Implied Volatility"
-                delay={0.3}
+                title="Volume Profile"
+                subtitle="Call & Put volume stacked by strike"
+                delay={0.25}
               >
-                <VolatilitySmileChart data={volSmileData} />
+                <VolumeProfileChart data={oiData} />
               </ChartCard>
             </div>
           </section>
 
-          {/* ROW 3: Time Series Analytics */}
+          {/* ROW 3: Volatility Analysis */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 rounded-full bg-[var(--red)]" />
+              <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                Volatility Analysis
+              </h2>
+              {patternData?.volatility_patterns?.skew_detected && (
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[var(--yellow)] text-black font-bold uppercase">
+                  Skew Detected
+                </span>
+              )}
+              {patternData?.volatility_patterns?.smile_detected && (
+                <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-[var(--cyan)] text-black font-bold uppercase">
+                  Smile Detected
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChartCard
+                title="Volatility Smile / Skew"
+                subtitle="Call & Put IV across strikes"
+                delay={0.3}
+              >
+                <VolatilitySmileChart data={volSmileData} />
+              </ChartCard>
+
+              <ChartCard
+                title="Volatility Surface"
+                subtitle="IV across strikes & expiries (bubble size = days to expiry)"
+                delay={0.35}
+              >
+                <VolatilitySurfaceChart data={volSurface} />
+              </ChartCard>
+            </div>
+
+            {/* Pattern Analysis Summary */}
+            {patternData && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Skew Direction</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {patternData.volatility_patterns?.skew_direction?.replace('_', ' ').toUpperCase() || 'Neutral'}
+                  </p>
+                </div>
+                <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Smile Curvature</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {patternData.volatility_patterns?.smile_curvature?.toFixed(4) ?? 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Activity Clusters</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {Object.keys(patternData.cluster_distribution || {}).length} groups
+                  </p>
+                </div>
+                <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">IV Spikes</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {patternData.iv_spikes?.length || 0} detected
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ROW 4: Time Series Analytics */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-5 rounded-full bg-[var(--green)]" />
@@ -363,19 +512,15 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard
-                title="Volume Heatmap"
-                subtitle="Trading volume by time & strike"
-                delay={0.3}
+                title="PCR Timeseries & Spot Price"
+                subtitle="Put-Call Ratio (OI & Volume) with spot overlay"
+                delay={0.35}
               >
-                <Heatmap
-                  data={heatmapState.data}
-                  xLabels={heatmapState.times}
-                  yLabels={heatmapState.strikes}
-                />
+                <PCRTimeseriesChart data={cumulativeOI} />
               </ChartCard>
 
               <ChartCard
-                title="Cumulative Open Interest Change"
+                title="Cumulative Open Interest"
                 subtitle="Call & Put OI trend over time"
                 delay={0.4}
               >
@@ -384,13 +529,64 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* ROW 4: AI Insights Panel */}
+          {/* ROW 5: Activity Heatmap */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 rounded-full bg-[var(--yellow)]" />
+              <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                Activity Heatmap
+              </h2>
+            </div>
+            <ChartCard
+              title="Open Interest Heatmap"
+              subtitle="OI intensity across strikes & timestamps"
+              delay={0.4}
+            >
+              <Heatmap
+                data={heatmapState.data}
+                xLabels={heatmapState.times}
+                yLabels={heatmapState.strikes}
+              />
+            </ChartCard>
+          </section>
+
+          {/* ROW 6: AI-Driven Pattern Detection */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 rounded-full bg-[var(--red)]" />
+              <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                AI-Driven Pattern Detection
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChartCard
+                title="Anomaly Detection Scatter"
+                subtitle="Isolation Forest: normal vs anomalous data points"
+                delay={0.45}
+              >
+                <AnomalyScatterChart data={anomalyScatter} />
+              </ChartCard>
+
+              <ChartCard
+                title="Options Greeks (Delta)"
+                subtitle="Call & Put Delta across strikes"
+                delay={0.5}
+              >
+                <GreeksChart data={greeksData} />
+              </ChartCard>
+            </div>
+          </section>
+
+          {/* ROW 7: AI Insights Panel */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-5 rounded-full bg-[var(--yellow)]" />
               <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                 AI Insights & Alerts
               </h2>
+              <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+                {insights.length} insight{insights.length !== 1 ? 's' : ''} generated
+              </span>
             </div>
             <div className="chart-container">
               <InsightsPanel
