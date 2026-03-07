@@ -1,9 +1,11 @@
-import { Bell, Search, RefreshCw, Wifi } from 'lucide-react';
+import { Bell, Search, RefreshCw, Wifi, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Header() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const navigate = useNavigate();
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -28,8 +30,17 @@ export default function Header() {
 
   return (
     <header className="h-14 border-b border-white/[0.06] bg-[var(--bg-secondary)]/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30">
-      {/* Left: Title & market status */}
+      {/* Left: Home button, Title & market status */}
       <div className="flex items-center gap-4">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate('/')}
+          className="w-8 h-8 rounded-lg bg-[var(--bg-primary)] border border-white/[0.08] flex items-center justify-center hover:border-[var(--blue)]/50 transition-colors cursor-pointer shrink-0"
+          title="Back to Home"
+        >
+          <Home size={14} className="text-[var(--text-secondary)]" />
+        </motion.button>
         <div>
           <h2 className="text-sm font-semibold text-[var(--text-primary)] leading-none">
             Options Analytics Dashboard

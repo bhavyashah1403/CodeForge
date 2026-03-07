@@ -5,7 +5,9 @@ import {
   Target,
   PieChart,
   Activity,
+  TrendingUp,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 // Layout
 import Sidebar from '../components/layout/Sidebar';
@@ -164,6 +166,7 @@ const mockInsights = [
 // ── Dashboard Page ───────────────────────────────────────────────
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     asset: 'NIFTY',
     expiry: '2026-02-17',
@@ -397,10 +400,28 @@ export default function Dashboard() {
           </section>
 
           {/* Footer */}
-          <footer className="text-center py-4 border-t border-white/[0.04]">
-            <p className="text-[11px] text-[var(--text-muted)]">
-              CodeForge Options Analytics · Built with React · Recharts · TailwindCSS — FOSS ❤️
-            </p>
+          <footer className="border-t border-white/[0.06] py-6 mt-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center">
+                  <TrendingUp size={14} className="text-white" />
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">
+                  CodeForge Options Analytics · Built for CodeForge Hackathon 2026
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => navigate('/')}
+                  className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  ← Back to Home
+                </button>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Made with FOSS ❤️ · React · TailwindCSS · Recharts · Python
+                </p>
+              </div>
+            </div>
           </footer>
         </main>
       </div>

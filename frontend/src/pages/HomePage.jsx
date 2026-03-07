@@ -203,10 +203,10 @@ export default function HomePage() {
             />
           </video>
 
-          {/* Heavy dark overlay layers for readability */}
-          <div className="absolute inset-0 bg-[var(--bg-primary)]/80" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-primary)] via-transparent to-[var(--bg-primary)]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-primary)]/90 via-[var(--bg-primary)]/50 to-[var(--bg-primary)]/70" />
+          {/* Lighter dark overlay layers — video shows through more */}
+          <div className="absolute inset-0 bg-[var(--bg-primary)]/55" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-primary)]/80 via-transparent to-[var(--bg-primary)]/80" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-primary)]/60 via-transparent to-[var(--bg-primary)]/50" />
 
           {/* Color accent glows */}
           <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-indigo-600/[0.1] rounded-full blur-[120px]" />
@@ -214,8 +214,8 @@ export default function HomePage() {
           <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: Text */}
+        <div className="relative z-10 max-w-4xl mx-auto text-center">
+          {/* Hero Content */}
           <motion.div initial="hidden" animate="visible" variants={stagger}>
             <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] backdrop-blur-sm mb-6">
               <div className="w-2 h-2 rounded-full bg-[var(--green)] animate-pulse" />
@@ -232,11 +232,11 @@ export default function HomePage() {
               Intelligence
             </motion.h1>
 
-            <motion.p variants={fadeUp} custom={2} className="mt-5 text-base md:text-lg text-[var(--text-secondary)] leading-relaxed max-w-xl">
+            <motion.p variants={fadeUp} custom={2} className="mt-5 text-base md:text-lg text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto">
               An advanced analytics platform that transforms complex options market data into clear insights using visualization and AI-driven pattern detection.
             </motion.p>
 
-            <motion.div variants={fadeUp} custom={3} className="mt-6 grid grid-cols-2 gap-3 max-w-md">
+            <motion.div variants={fadeUp} custom={3} className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto">
               {[
                 { label: 'Open Interest', icon: <BarChart3 size={14} /> },
                 { label: 'Trading Volume', icon: <Layers size={14} /> },
@@ -253,7 +253,7 @@ export default function HomePage() {
               ))}
             </motion.div>
 
-            <motion.div variants={fadeUp} custom={4} className="mt-8 flex flex-wrap items-center gap-4">
+            <motion.div variants={fadeUp} custom={4} className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
@@ -274,96 +274,6 @@ export default function HomePage() {
                 <Github size={16} />
                 View Source
               </motion.a>
-            </motion.div>
-          </motion.div>
-
-          {/* Right: Dashboard preview with trading video */}
-          <motion.div
-            initial={{ opacity: 0, x: 40, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="relative"
-          >
-            <div className="relative rounded-2xl overflow-hidden border border-white/[0.1] shadow-2xl shadow-black/50 bg-[var(--bg-card)]">
-              {/* Browser frame */}
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.06] bg-[var(--bg-secondary)]/90 backdrop-blur-sm">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-                </div>
-                <div className="flex-1 mx-3">
-                  <div className="bg-[var(--bg-primary)]/90 rounded-md px-3 py-1 text-[10px] text-[var(--text-muted)] font-mono truncate">
-                    localhost:5173/dashboard
-                  </div>
-                </div>
-              </div>
-
-              {/* Stock market trading video inside the preview */}
-              <div className="relative aspect-video bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-primary)]">
-                <video
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                >
-                  <source
-                    src="https://videos.pexels.com/video-files/3945009/3945009-sd_640_360_25fps.mp4"
-                    type="video/mp4"
-                  />
-                </video>
-
-                {/* Dark overlay on the preview video */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-[var(--bg-primary)]/30 to-cyan-900/30" />
-
-                {/* Play button overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center mb-3 hover:scale-110 hover:bg-white/20 transition-all cursor-pointer">
-                    <Play size={20} className="text-white ml-0.5" />
-                  </div>
-                  <p className="text-[11px] text-white/60 font-medium">Live Trading Analytics</p>
-                </div>
-
-                {/* Simulated dashboard wireframe overlay */}
-                <div className="absolute inset-0 p-3 pointer-events-none opacity-20">
-                  <div className="grid grid-cols-4 gap-1.5 mb-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-8 rounded bg-white/[0.08] border border-white/[0.06]" />
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div className="h-24 rounded bg-white/[0.08] border border-white/[0.06]" />
-                    <div className="h-24 rounded bg-white/[0.08] border border-white/[0.06]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="absolute -bottom-4 -left-4 px-4 py-2.5 rounded-xl bg-[var(--bg-card)]/90 backdrop-blur-md border border-white/[0.1] shadow-xl flex items-center gap-3"
-            >
-              <div className="w-8 h-8 rounded-lg bg-[var(--green-dim)] flex items-center justify-center">
-                <TrendingUp size={16} className="text-[var(--green)]" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-[var(--text-primary)]">PCR: 1.14</p>
-                <p className="text-[10px] text-[var(--green)]">Bullish Sentiment</p>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2 }}
-              className="absolute -top-3 -right-3 px-3 py-2 rounded-xl bg-[var(--bg-card)]/90 backdrop-blur-md border border-white/[0.1] shadow-xl flex items-center gap-2"
-            >
-              <Sparkles size={14} className="text-[var(--yellow)]" />
-              <span className="text-[11px] font-medium text-[var(--yellow)]">AI Anomaly Detected</span>
             </motion.div>
           </motion.div>
         </div>
