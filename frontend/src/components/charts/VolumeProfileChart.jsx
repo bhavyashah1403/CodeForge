@@ -33,12 +33,30 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function VolumeProfileChart({ data = [] }) {
+  // Compute total volume per strike for sorting and ensure data is non-empty
+  const chartData = data
+    .map((d) => ({
+      ...d,
+      volume_CE: d.volume_CE ?? 0,
+      volume_PE: d.volume_PE ?? 0,
+      total_vol: (d.volume_CE ?? 0) + (d.volume_PE ?? 0),
+    }))
+    .filter((d) => d.total_vol > 0);
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[320px] text-[var(--text-muted)] text-xs">
+        No volume data for selected expiry
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart
-        data={data}
+        data={chartData}
         margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-        barGap={1}
+        barGap={2}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
         <XAxis
@@ -68,17 +86,15 @@ export default function VolumeProfileChart({ data = [] }) {
           dataKey="volume_CE"
           name="Call Volume"
           fill="#ef4444"
-          fillOpacity={0.7}
+          fillOpacity={0.85}
           radius={[3, 3, 0, 0]}
-          stackId="volume"
         />
         <Bar
           dataKey="volume_PE"
           name="Put Volume"
           fill="#22c55e"
-          fillOpacity={0.7}
+          fillOpacity={0.85}
           radius={[3, 3, 0, 0]}
-          stackId="volume"
         />
       </BarChart>
     </ResponsiveContainer>
