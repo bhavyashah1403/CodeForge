@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -10,19 +10,25 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
+import { fetchExpiries } from '../../services/api';
 
-const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX'];
+// Only NIFTY data is available in the training dataset
+const assets = ['NIFTY'];
 
-const expiryDates = [
-  '2026-02-17',
-  '2026-02-24',
-  '2026-03-02',
-  '2026-03-10',
-  '2026-03-17',
-];
+const fallbackExpiries = ['2026-02-17', '2026-02-24', '2026-03-02'];
 
 export default function Sidebar({ filters, onFilterChange }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [expiryDates, setExpiryDates] = useState(fallbackExpiries);
+
+  useEffect(() => {
+    fetchExpiries()
+      .then((res) => {
+        const list = res?.expiries || res;
+        if (Array.isArray(list) && list.length > 0) setExpiryDates(list);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (key, value) => {
     onFilterChange({ ...filters, [key]: value });
