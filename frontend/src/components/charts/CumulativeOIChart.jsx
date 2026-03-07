@@ -39,10 +39,24 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function CumulativeOIChart({ data = [] }) {
+  const chartData = data.map((d) => ({
+    ...d,
+    time:
+      d.time ||
+      (d.datetime
+        ? new Date(d.datetime).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : ''),
+    cumulative_oi_ce: d.cumulative_oi_ce ?? d.total_oi_CE ?? 0,
+    cumulative_oi_pe: d.cumulative_oi_pe ?? d.total_oi_PE ?? 0,
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <AreaChart
-        data={data}
+        data={chartData}
         margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
       >
         <defs>
