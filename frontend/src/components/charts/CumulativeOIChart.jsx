@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  Legend,
 } from 'recharts';
 
 /**
@@ -85,6 +86,11 @@ export default function CumulativeOIChart({ data = [] }) {
           axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
         />
         <Tooltip content={<CustomTooltip />} />
+        <Legend
+          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+          iconType="circle"
+          iconSize={8}
+        />
         <Area
           type="monotone"
           dataKey="cumulative_oi_ce"

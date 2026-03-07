@@ -315,13 +315,23 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
 
+        {loading && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-[var(--blue)] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-xs text-[var(--text-muted)]">Loading NIFTY analytics...</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && (
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* ROW 1: Market Pulse Metrics */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-5 rounded-full bg-[var(--blue)]" />
               <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                Market Pulse
+                Market Pulse — NIFTY
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -419,7 +429,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard
                 title="Open Interest Distribution"
-                subtitle="Call vs Put OI across strikes"
+                subtitle="Where are traders positioned? Tall bars = heavy bets at that strike"
                 delay={0.2}
               >
                 <OIDistributionChart data={oiData} />
@@ -427,7 +437,7 @@ export default function Dashboard() {
 
               <ChartCard
                 title="Volume Profile"
-                subtitle="Call & Put volume stacked by strike"
+                subtitle="Today's trading activity — high volume = active interest at that strike"
                 delay={0.25}
               >
                 <VolumeProfileChart data={oiData} />
@@ -456,7 +466,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard
                 title="Volatility Smile / Skew"
-                subtitle="Call & Put IV across strikes"
+                subtitle="IV curve across strikes — U-shape = smile, tilt = skew (fear/greed)"
                 delay={0.3}
               >
                 <VolatilitySmileChart data={volSmileData} />
@@ -464,7 +474,7 @@ export default function Dashboard() {
 
               <ChartCard
                 title="Volatility Surface"
-                subtitle="IV across strikes & expiries (bubble size = days to expiry)"
+                subtitle="IV landscape across strikes & expiries — bigger dots = more time to expiry"
                 delay={0.35}
               >
                 <VolatilitySurfaceChart data={volSurface} />
@@ -479,18 +489,21 @@ export default function Dashboard() {
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
                     {patternData.volatility_patterns?.skew_direction?.replace('_', ' ').toUpperCase() || 'Neutral'}
                   </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Put skew = crash fear, Call skew = rally demand</p>
                 </div>
                 <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
                   <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Smile Curvature</p>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
                     {patternData.volatility_patterns?.smile_curvature?.toFixed(4) ?? 'N/A'}
                   </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Higher curvature = more uncertainty about direction</p>
                 </div>
                 <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
                   <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Activity Clusters</p>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
                     {Object.keys(patternData.cluster_distribution || {}).length} groups
                   </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">KMeans groups strikes by trading intensity</p>
                 </div>
                 <div className="bg-[var(--bg-card)] border border-white/[0.06] rounded-lg p-3">
                   <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">IV Spikes</p>
@@ -513,7 +526,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard
                 title="PCR Timeseries & Spot Price"
-                subtitle="Put-Call Ratio (OI & Volume) with spot overlay"
+                subtitle="PCR > 1 = bullish (more puts written), PCR < 1 = bearish. Yellow line = NIFTY spot"
                 delay={0.35}
               >
                 <PCRTimeseriesChart data={cumulativeOI} />
@@ -521,7 +534,7 @@ export default function Dashboard() {
 
               <ChartCard
                 title="Cumulative Open Interest"
-                subtitle="Call & Put OI trend over time"
+                subtitle="Total OI trend over time — rising OI = new positions, falling OI = exits"
                 delay={0.4}
               >
                 <CumulativeOIChart data={cumulativeOI} />
@@ -560,8 +573,8 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard
-                title="Anomaly Detection Scatter"
-                subtitle="Isolation Forest: normal vs anomalous data points"
+                title="Anomaly Detection (Isolation Forest)"
+                subtitle="Red dots = AI-flagged unusual trading patterns vs normal activity (blue)"
                 delay={0.45}
               >
                 <AnomalyScatterChart data={anomalyScatter} />
@@ -569,7 +582,7 @@ export default function Dashboard() {
 
               <ChartCard
                 title="Options Greeks (Delta)"
-                subtitle="Call & Put Delta across strikes"
+                subtitle="Delta measures price sensitivity — Call delta (0→1), Put delta (0→-1)"
                 delay={0.5}
               >
                 <GreeksChart data={greeksData} />
@@ -620,6 +633,7 @@ export default function Dashboard() {
             </div>
           </footer>
         </main>
+        )}
       </div>
     </div>
   );
