@@ -1,0 +1,61 @@
+# ─── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environment ────────────────────────────────
+venv/
+env/
+.venv/
+ENV/
+
+# ─── IDE / Editor ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ─── DuckDB database file ──────────────────────────────
+*.duckdb
+*.duckdb.wal
+
+# ─── OS files ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Jupyter ────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── Environment variables ──────────────────────────────
+.env
+.env.local
+
+# ─── Byte-compiled / cache ──────────────────────────────
+*.pyc
+*.pyo
+*.pyd
+
+# ─── Distribution / packaging ───────────────────────────
+*.tar.gz
+*.whl
+
+# ─── Test / Coverage ────────────────────────────────────
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# ─── Logs ───────────────────────────────────────────────
+*.log
