@@ -184,8 +184,10 @@ export default function Dashboard() {
   };
 
   const loadData = useCallback(async () => {
+    console.log('[Dashboard] Starting data load with filters:', filters);
     setLoading(true);
     try {
+      console.log('[Dashboard] Making API calls...');
       const [summary, oi, volSmile, heatmap, aiInsights, cumOI, scatter, greeks, surface, patterns] =
         await Promise.allSettled([
           fetchMarketSummary(filters),
@@ -199,11 +201,14 @@ export default function Dashboard() {
           fetchVolatilitySurface(filters),
           fetchPatternAnalysis(filters),
         ]);
+      console.log('[Dashboard] All API calls completed');
 
       // Market Summary
+      console.log('[Dashboard] Summary result:', summary.status, summary.value);
       if (summary.status === 'fulfilled' && summary.value) {
         const s = summary.value;
-        setMarketData({
+        console.log('[Dashboard] Setting market data:', s);
+        const newMarketData = {
           spotPrice: s.spot_price,
           atmStrike: s.atm_strike,
           pcr: s.pcr_oi,
@@ -212,7 +217,11 @@ export default function Dashboard() {
           anomaliesCount: s.anomalies_count || 0,
           volumeSpikes: s.volume_spikes || 0,
           sentiment: s.sentiment || 'Neutral',
-        });
+        };
+        console.log('[Dashboard] New market data:', newMarketData);
+        setMarketData(newMarketData);
+      } else {
+        console.error('[Dashboard] Summary failed:', summary.reason);
       }
 
       // OI Distribution
