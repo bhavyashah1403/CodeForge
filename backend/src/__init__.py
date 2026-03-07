@@ -1,2 +1,1 @@
-# CodeForge – AI-Powered Options Market Analytics
-# Core source code package
+# Options Analytics Platform - Source Package
