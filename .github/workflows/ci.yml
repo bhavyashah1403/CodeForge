@@ -1,0 +1,97 @@
+# CodeForge – CI/CD Pipeline
+# Continuous Integration workflow for the Options Market Analytics platform.
+
+name: CI – CodeForge Options Analytics
+
+on:
+  push:
+    branches: ["main", "develop", "feature/**"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-validate:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python setup ──────────────────────────────────────────────────
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"                 # cache pip downloads for faster runs
+
+      # ── 3. Install dependencies ──────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── 4. Validate Python scripts load correctly ────────────────────────
+      - name: Validate Python scripts (syntax & imports)
+        run: |
+          echo "🔍  Checking all .py files for syntax errors..."
+          python -m py_compile scripts/run_dashboard.py
+          python -m py_compile src/__init__.py
+          find . -name "*.py" -not -path "./.git/*" | while read f; do
+            echo "  ✓ Compiling $f"
+            python -m py_compile "$f"
+          done
+          echo "✅  All Python files compiled successfully."
+
+      # ── 5. Verify dashboard script has no import errors ──────────────────
+      - name: Verify Streamlit dashboard imports
+        run: |
+          echo "🔍  Verifying scripts/run_dashboard.py imports..."
+          python -c "
+          import importlib.util, sys, os
+          # Load the dashboard module without executing Streamlit server
+          spec = importlib.util.spec_from_file_location('run_dashboard', 'scripts/run_dashboard.py')
+          mod = importlib.util.module_from_spec(spec)
+          # Patch streamlit to prevent server startup during import check
+          import unittest.mock as mock
+          with mock.patch('streamlit.set_page_config'), \
+               mock.patch('streamlit.sidebar'), \
+               mock.patch('streamlit.title'), \
+               mock.patch('streamlit.markdown'), \
+               mock.patch('streamlit.header'), \
+               mock.patch('streamlit.columns', return_value=[mock.MagicMock()]*4), \
+               mock.patch('streamlit.selectbox'), \
+               mock.patch('streamlit.dataframe'), \
+               mock.patch('streamlit.plotly_chart'), \
+               mock.patch('streamlit.caption'), \
+               mock.patch('streamlit.cache_data', lambda f: f), \
+               mock.patch('streamlit.error'), \
+               mock.patch('streamlit.stop'):
+              spec.loader.exec_module(mod)
+          print('✅  Dashboard script loaded — no import errors.')
+          "
+
+      # ── 6. Verify data files exist ──────────────────────────────────────
+      - name: Verify dataset integrity
+        run: |
+          echo "🔍  Checking data/ directory..."
+          csv_count=$(find data/ -name "*.csv" | wc -l)
+          echo "   Found $csv_count CSV file(s) in data/"
+          if [ "$csv_count" -eq 0 ]; then
+            echo "❌  No CSV data files found!"
+            exit 1
+          fi
+          echo "✅  Dataset integrity check passed."
+
+      # ── 7. Quick lint (optional, non-blocking) ──────────────────────────
+      - name: Lint check (advisory)
+        continue-on-error: true
+        run: |
+          pip install flake8
+          echo "🔍  Running flake8 lint (advisory — failures won't block CI)..."
+          flake8 scripts/ src/ --max-line-length=120 --statistics || true
+          echo "ℹ️   Lint check complete (advisory only)."
